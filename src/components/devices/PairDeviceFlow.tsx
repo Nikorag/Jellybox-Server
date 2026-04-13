@@ -27,6 +27,7 @@ export default function PairDeviceFlow() {
       return
     }
 
+    if (!res.rawKey || !res.deviceId) return
     setResult({ rawKey: res.rawKey, deviceId: res.deviceId })
     setStep('key')
   }

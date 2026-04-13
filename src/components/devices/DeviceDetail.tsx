@@ -51,7 +51,7 @@ export default function DeviceDetail({
     setRotating(true)
     const res = await rotateDeviceKeyAction(device.id)
     setRotating(false)
-    if (!res.error) {
+    if (!res.error && res.rawKey && res.deviceId) {
       setNewKey({ rawKey: res.rawKey, deviceId: res.deviceId })
       setRotateOpen(false)
     }
