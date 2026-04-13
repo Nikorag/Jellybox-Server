@@ -1,0 +1,198 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import type { Device, JellyfinClient } from '@prisma/client'
+import { Card, CardContent, CardHeader, Button, Input, ConfirmDialog } from '@/components/ui'
+import ApiKeyDisplay from './ApiKeyDisplay'
+import {
+  updateDeviceAction,
+  rotateDeviceKeyAction,
+  deleteDeviceAction,
+} from '@/app/dashboard/devices/actions'
+import { formatRelativeTime, formatDate } from '@/lib/utils'
+
+type DeviceWithClient = Device & { defaultClient: JellyfinClient | null }
+
+export default function DeviceDetail({
+  device,
+  clients,
+}: {
+  device: DeviceWithClient
+  clients: JellyfinClient[]
+}) {
+  const router = useRouter()
+  const [name, setName] = useState(device.name)
+  const [defaultClientId, setDefaultClientId] = useState(device.defaultClientId ?? '')
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const [rotateOpen, setRotateOpen] = useState(false)
+  const [rotating, setRotating] = useState(false)
+  const [newKey, setNewKey] = useState<{ rawKey: string; deviceId: string } | null>(null)
+
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setSaveError(null)
+    const fd = new FormData()
+    fd.set('name', name)
+    if (defaultClientId) fd.set('defaultClientId', defaultClientId)
+    const res = await updateDeviceAction(device.id, fd)
+    setSaving(false)
+    if (res.error) setSaveError(res.error)
+    else router.refresh()
+  }
+
+  async function handleRotate() {
+    setRotating(true)
+    const res = await rotateDeviceKeyAction(device.id)
+    setRotating(false)
+    if (!res.error) {
+      setNewKey({ rawKey: res.rawKey, deviceId: res.deviceId })
+      setRotateOpen(false)
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    await deleteDeviceAction(device.id)
+    router.push('/dashboard/devices')
+  }
+
+  if (newKey) {
+    return (
+      <div>
+        <p className="text-sm text-jf-text-secondary mb-4">
+          Your device API key has been rotated. Update the firmware on your device with this new key.
+        </p>
+        <ApiKeyDisplay rawKey={newKey.rawKey} deviceId={newKey.deviceId} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5 max-w-lg">
+      {/* Settings */}
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-semibold text-jf-text-primary">Settings</h2>
+        </CardHeader>
+        <CardContent>
+          {saveError && (
+            <div className="mb-4 p-3 rounded-lg bg-jf-error/10 border border-jf-error/30 text-jf-error text-sm">
+              {saveError}
+            </div>
+          )}
+          <form onSubmit={handleSave} className="space-y-4">
+            <Input
+              label="Device name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-jf-text-secondary">
+                Default Jellyfin client
+              </label>
+              <select
+                value={defaultClientId}
+                onChange={(e) => setDefaultClientId(e.target.value)}
+                className="form-select w-full rounded-lg bg-jf-elevated border-jf-border text-jf-text-primary text-sm focus:border-jf-primary focus:ring-jf-primary/30"
+              >
+                <option value="">— None —</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.deviceName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Button type="submit" loading={saving}>Save Changes</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Status */}
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-semibold text-jf-text-primary">Status</h2>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-jf-text-muted">API key prefix</span>
+            <code className="text-jf-text-primary font-mono">{device.apiKeyPrefix}…</code>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-jf-text-muted">Last seen</span>
+            <span className="text-jf-text-primary">
+              {device.lastSeenAt ? formatRelativeTime(device.lastSeenAt) : 'Never'}
+            </span>
+          </div>
+          {device.firmwareVersion && (
+            <div className="flex justify-between">
+              <span className="text-jf-text-muted">Firmware</span>
+              <span className="text-jf-text-primary">v{device.firmwareVersion}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span className="text-jf-text-muted">Added</span>
+            <span className="text-jf-text-primary">{formatDate(device.createdAt)}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Danger zone */}
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-semibold text-jf-error">Danger Zone</h2>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-jf-text-primary">Rotate API key</p>
+              <p className="text-xs text-jf-text-muted">Revoke the current key and issue a new one.</p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => setRotateOpen(true)}>
+              Rotate Key
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-4 pt-3 border-t border-jf-border">
+            <div>
+              <p className="text-sm font-medium text-jf-text-primary">Remove device</p>
+              <p className="text-xs text-jf-text-muted">Permanently remove this device and revoke its key.</p>
+            </div>
+            <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+              Remove
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ConfirmDialog
+        open={rotateOpen}
+        onClose={() => setRotateOpen(false)}
+        onConfirm={handleRotate}
+        title="Rotate API key?"
+        description="The current key will be immediately revoked. You must update the firmware on this device with the new key."
+        confirmLabel="Rotate Key"
+        loading={rotating}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+        title="Remove device?"
+        description="This will permanently remove this device and revoke its API key. Playback requests from this device will stop working immediately."
+        confirmLabel="Remove device"
+        loading={deleting}
+      />
+    </div>
+  )
+}

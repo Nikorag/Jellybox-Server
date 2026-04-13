@@ -1,0 +1,226 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── NextAuth v5 required models ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  accounts       Account[]
+  sessions       Session[]
+  jellyfinServer JellyfinServer?
+  jellyfinClients JellyfinClient[]
+  devices        Device[]
+  rfidTags       RfidTag[]
+  activityLogs   ActivityLog[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Jellyfin Integration ────────────────────────────────────────────────────
+
+enum JellyfinServerStatus {
+  CONNECTED
+  UNREACHABLE
+  AUTH_ERROR
+  UNKNOWN
+}
+
+model JellyfinServer {
+  id         String               @id @default(cuid())
+  userId     String               @unique
+  serverUrl  String
+  /// AES-256-GCM encrypted Jellyfin API token (format: iv:authTag:ciphertext, all hex)
+  apiToken   String
+  serverId   String?
+  serverName String?
+  status     JellyfinServerStatus @default(UNKNOWN)
+  lastCheckedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clients JellyfinClient[]
+
+  @@map("jellyfin_servers")
+}
+
+model JellyfinClient {
+  id               String   @id @default(cuid())
+  userId           String
+  jellyfinServerId String
+  /// Jellyfin's persistent DeviceId (stable across sessions)
+  jellyfinDeviceId String
+  deviceName       String
+  lastSeenAt       DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jellyfinServer JellyfinServer @relation(fields: [jellyfinServerId], references: [id], onDelete: Cascade)
+  devices        Device[]
+
+  @@unique([jellyfinServerId, jellyfinDeviceId])
+  @@map("jellyfin_clients")
+}
+
+// ─── Physical Devices ────────────────────────────────────────────────────────
+
+model Device {
+  id               String    @id @default(cuid())
+  userId           String
+  name             String
+  /// bcrypt hash of the raw API key
+  apiKeyHash       String
+  /// First 8 characters of the raw API key — for display only
+  apiKeyPrefix     String
+  defaultClientId  String?
+  lastSeenAt       DateTime?
+  firmwareVersion  String?
+
+  /// Set when device is in scan-capture mode; links back to a pending registration session
+  scanModeToken     String?
+  /// Scan mode auto-expires after this time
+  scanModeExpiresAt DateTime?
+  /// Tag UID written here when the device scans during scan-capture mode
+  pendingScanTagId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultClient JellyfinClient? @relation(fields: [defaultClientId], references: [id], onDelete: SetNull)
+  activityLogs  ActivityLog[]
+
+  @@map("devices")
+}
+
+// ─── RFID Tags ───────────────────────────────────────────────────────────────
+
+enum JellyfinItemType {
+  MOVIE
+  SERIES
+  EPISODE
+  ALBUM
+  PLAYLIST
+  UNKNOWN
+}
+
+model RfidTag {
+  id    String @id @default(cuid())
+  userId String
+  /// Raw RFID hardware UID as reported by the device
+  tagId String
+  label String
+
+  // Jellyfin content assignment (cached at assignment time)
+  jellyfinItemId       String?
+  jellyfinItemType     JellyfinItemType?
+  jellyfinItemTitle    String?
+  /// Jellyfin image tag for constructing artwork URL
+  jellyfinItemImageTag String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityLogs ActivityLog[]
+
+  // A tag ID must be unique per user
+  @@unique([userId, tagId])
+  @@map("rfid_tags")
+}
+
+// ─── Activity Logs ───────────────────────────────────────────────────────────
+
+model ActivityLog {
+  id         String  @id @default(cuid())
+  userId     String
+  deviceId   String?
+  rfidTagId  String?
+
+  // Snapshots captured at log time (survive deletions)
+  deviceName        String
+  tagId             String
+  jellyfinItemTitle String?
+
+  success   Boolean
+  /// Error code when success = false: UNASSIGNED | OFFLINE | AUTH_ERROR | RATE_LIMITED | UNKNOWN
+  errorCode String?
+
+  createdAt DateTime @default(now())
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device  Device?     @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  rfidTag RfidTag?    @relation(fields: [rfidTagId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([deviceId, createdAt(sort: Desc)])
+  @@map("activity_logs")
+}
