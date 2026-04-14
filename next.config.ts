@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
         // Jellyfin image proxy — allows any query string (?imageProxy=...&tag=...)
         pathname: '/api/jellyfin/**',
       },
+      {
+        pathname: '/Icon.png',
+      },
     ],
     remotePatterns: [
       // Allow Jellyfin server images — patterns are added at runtime via env

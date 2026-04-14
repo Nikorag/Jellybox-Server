@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -7,8 +8,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       {/* Header */}
       <header className="px-6 py-5 border-b border-jf-border">
         <Link href="/" className="flex items-center gap-2 w-fit">
-          <div className="w-8 h-8 rounded-lg bg-jf-primary flex items-center justify-center">
-            <span className="text-white text-sm font-bold">JB</span>
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <Image src="/Icon.png" alt="Jellybox" width={32} height={32} />
           </div>
           <span className="text-jf-text-primary font-semibold text-lg">
             Jellybox Server

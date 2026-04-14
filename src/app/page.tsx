@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants'
@@ -13,8 +14,8 @@ export default function LandingPage() {
       {/* Header */}
       <header className="px-6 py-5 border-b border-jf-border flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-jf-primary flex items-center justify-center">
-            <span className="text-white text-sm font-bold">JB</span>
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <Image src="/Icon.png" alt="Jellybox" width={32} height={32} />
           </div>
           <span className="font-semibold text-jf-text-primary text-lg">Jellybox Server</span>
         </Link>

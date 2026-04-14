@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
@@ -77,8 +78,8 @@ export default function DashboardNav() {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-jf-border">
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-jf-primary flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-bold">JB</span>
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <Image src="/Icon.png" alt="Jellybox" width={32} height={32} />
           </div>
           <span className="font-semibold text-jf-text-primary">Jellybox</span>
         </Link>
