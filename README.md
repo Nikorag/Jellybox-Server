@@ -1,5 +1,9 @@
 # Jellybox Server
 
+<p align="center">
+  <img src="Jellybox.png" alt="Jellybox" width="120" />
+</p>
+
 > SaaS companion app that links your Jellyfin server to physical RFID devices, letting children
 > play media by scanning tags — no apps, no passwords, no rabbit holes.
 
