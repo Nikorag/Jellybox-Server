@@ -4,10 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Device, JellyfinClient } from '@prisma/client'
 import { Card, CardContent, CardHeader, Button, Input, ConfirmDialog } from '@/components/ui'
-import ApiKeyDisplay from './ApiKeyDisplay'
 import {
   updateDeviceAction,
-  rotateDeviceKeyAction,
   deleteDeviceAction,
 } from '@/app/dashboard/devices/actions'
 import { formatRelativeTime, formatDate } from '@/lib/utils'
@@ -27,10 +25,6 @@ export default function DeviceDetail({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  const [rotateOpen, setRotateOpen] = useState(false)
-  const [rotating, setRotating] = useState(false)
-  const [newKey, setNewKey] = useState<{ rawKey: string; deviceId: string } | null>(null)
-
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -47,31 +41,10 @@ export default function DeviceDetail({
     else router.refresh()
   }
 
-  async function handleRotate() {
-    setRotating(true)
-    const res = await rotateDeviceKeyAction(device.id)
-    setRotating(false)
-    if (!res.error && res.rawKey && res.deviceId) {
-      setNewKey({ rawKey: res.rawKey, deviceId: res.deviceId })
-      setRotateOpen(false)
-    }
-  }
-
   async function handleDelete() {
     setDeleting(true)
     await deleteDeviceAction(device.id)
     router.push('/dashboard/devices')
-  }
-
-  if (newKey) {
-    return (
-      <div>
-        <p className="text-sm text-jf-text-secondary mb-4">
-          Your device API key has been rotated. Update the firmware on your device with this new key.
-        </p>
-        <ApiKeyDisplay rawKey={newKey.rawKey} deviceId={newKey.deviceId} />
-      </div>
-    )
   }
 
   return (
@@ -125,10 +98,6 @@ export default function DeviceDetail({
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-jf-text-muted">API key prefix</span>
-            <code className="text-jf-text-primary font-mono">{device.apiKeyPrefix}…</code>
-          </div>
-          <div className="flex justify-between">
             <span className="text-jf-text-muted">Last seen</span>
             <span className="text-jf-text-primary">
               {device.lastSeenAt ? formatRelativeTime(device.lastSeenAt) : 'Never'}
@@ -155,15 +124,6 @@ export default function DeviceDetail({
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium text-jf-text-primary">Rotate API key</p>
-              <p className="text-xs text-jf-text-muted">Revoke the current key and issue a new one.</p>
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => setRotateOpen(true)}>
-              Rotate Key
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-4 pt-3 border-t border-jf-border">
-            <div>
               <p className="text-sm font-medium text-jf-text-primary">Remove device</p>
               <p className="text-xs text-jf-text-muted">Permanently remove this device and revoke its key.</p>
             </div>
@@ -173,16 +133,6 @@ export default function DeviceDetail({
           </div>
         </CardContent>
       </Card>
-
-      <ConfirmDialog
-        open={rotateOpen}
-        onClose={() => setRotateOpen(false)}
-        onConfirm={handleRotate}
-        title="Rotate API key?"
-        description="The current key will be immediately revoked. You must update the firmware on this device with the new key."
-        confirmLabel="Rotate Key"
-        loading={rotating}
-      />
 
       <ConfirmDialog
         open={deleteOpen}

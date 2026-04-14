@@ -21,7 +21,6 @@ export default function DeviceCard({ device }: { device: DeviceWithClient }) {
           <div className="min-w-0">
             <p className="font-medium text-jf-text-primary text-sm truncate">{device.name}</p>
             <p className="text-xs text-jf-text-muted">
-              Key: {device.apiKeyPrefix}… ·{' '}
               {device.lastSeenAt
                 ? `Last seen ${formatRelativeTime(device.lastSeenAt)}`
                 : 'Never connected'}

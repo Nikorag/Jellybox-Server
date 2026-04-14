@@ -77,29 +77,6 @@ export async function updateDeviceAction(
   return {}
 }
 
-/** Revoke the current API key and issue a new one. Returns the new raw key. */
-export async function rotateDeviceKeyAction(
-  deviceId: string,
-): Promise<CreateDeviceResult> {
-  const session = await auth()
-  if (!session?.user?.id) return { error: 'Unauthorised' }
-
-  const device = await db.device.findFirst({
-    where: { id: deviceId, userId: session.user.id },
-  })
-  if (!device) return { error: 'Device not found.' }
-
-  const { rawKey, hash, prefix } = await generateDeviceApiKey()
-
-  await db.device.update({
-    where: { id: deviceId },
-    data: { apiKeyHash: hash, apiKeyPrefix: prefix },
-  })
-
-  revalidatePath(`/dashboard/devices/${deviceId}`)
-  return { rawKey, deviceId }
-}
-
 export async function deleteDeviceAction(
   deviceId: string,
 ): Promise<{ error?: string }> {
