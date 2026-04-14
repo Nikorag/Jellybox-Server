@@ -14,6 +14,7 @@ const PUBLIC_PATHS = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/api/play',
+  '/api/device/me',
   '/api/health',
 ]
 
