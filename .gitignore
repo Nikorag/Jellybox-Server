@@ -28,6 +28,10 @@ prisma/migrations/dev/
 # Vercel
 .vercel
 
+# PWA — Workbox generated files (if using a build-time SW generator in future)
+public/workbox-*.js
+public/workbox-*.js.map
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

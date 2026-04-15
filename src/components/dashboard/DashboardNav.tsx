@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -83,38 +84,28 @@ const navItems: NavItem[] = [
   },
 ]
 
-export default function DashboardNav({
+function NavContent({
+  visibleItems,
+  pathname,
   partnerAccounts,
   activeAccountId,
   selfId,
   selfName,
   selfEmail,
+  onNavigate,
 }: {
+  visibleItems: NavItem[]
+  pathname: string
   partnerAccounts: ContextAccount[]
   activeAccountId: string
   selfId: string
   selfName: string | null
   selfEmail: string
+  onNavigate?: () => void
 }) {
-  const pathname = usePathname()
-  const isPartnerContext = activeAccountId !== selfId
-
-  const visibleItems = navItems.filter((item) => !(item.ownerOnly && isPartnerContext))
-
   return (
-    <nav
-      className="flex flex-col h-full bg-jf-surface border-r border-jf-border w-60 flex-shrink-0"
-      aria-label="Main navigation"
-    >
-      {/* Logo */}
-      <div className="px-5 py-5 border-b border-jf-border">
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <Image src="/Icon.png" alt="Jellybox" width={32} height={32} className="flex-shrink-0" />
-          <span className="font-semibold text-jf-text-primary">Jellybox</span>
-        </Link>
-      </div>
-
-      {/* Context switcher — only shown when the user has accounts they can switch to */}
+    <>
+      {/* Context switcher */}
       {partnerAccounts.length > 0 && (
         <ContextSwitcher
           partnerAccounts={partnerAccounts}
@@ -137,6 +128,7 @@ export default function DashboardNav({
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                 isActive
@@ -178,6 +170,117 @@ export default function DashboardNav({
           </button>
         </div>
       </div>
-    </nav>
+    </>
+  )
+}
+
+export default function DashboardNav({
+  partnerAccounts,
+  activeAccountId,
+  selfId,
+  selfName,
+  selfEmail,
+}: {
+  partnerAccounts: ContextAccount[]
+  activeAccountId: string
+  selfId: string
+  selfName: string | null
+  selfEmail: string
+}) {
+  const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const isPartnerContext = activeAccountId !== selfId
+
+  const visibleItems = navItems.filter((item) => !(item.ownerOnly && isPartnerContext))
+
+  // Close mobile nav on route change
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  const sharedProps = {
+    visibleItems,
+    pathname,
+    partnerAccounts,
+    activeAccountId,
+    selfId,
+    selfName,
+    selfEmail,
+  }
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <nav
+        className="hidden md:flex flex-col h-full bg-jf-surface border-r border-jf-border w-60 flex-shrink-0"
+        aria-label="Main navigation"
+      >
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-jf-border">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
+            <Image src="/Icon.png" alt="Jellybox" width={32} height={32} className="flex-shrink-0" />
+            <span className="font-semibold text-jf-text-primary">Jellybox</span>
+          </Link>
+        </div>
+
+        <NavContent {...sharedProps} />
+      </nav>
+
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-jf-surface border-b border-jf-border flex items-center px-4 gap-3">
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="p-2 rounded-md text-jf-text-secondary hover:text-jf-text-primary hover:bg-jf-elevated transition-colors"
+          aria-label="Open navigation"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <Link href="/dashboard" className="flex items-center gap-2">
+          <Image src="/Icon.png" alt="Jellybox" width={28} height={28} className="flex-shrink-0" />
+          <span className="font-semibold text-jf-text-primary">Jellybox</span>
+        </Link>
+      </div>
+
+      {/* Mobile slide-in nav */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Panel */}
+          <nav
+            className="relative flex flex-col w-72 max-w-[85vw] h-full bg-jf-surface border-r border-jf-border"
+            aria-label="Main navigation"
+          >
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-jf-border flex items-center justify-between">
+              <Link href="/dashboard" className="flex items-center gap-2.5" onClick={() => setMobileOpen(false)}>
+                <Image src="/Icon.png" alt="Jellybox" width={28} height={28} className="flex-shrink-0" />
+                <span className="font-semibold text-jf-text-primary">Jellybox</span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="p-1.5 rounded-md text-jf-text-muted hover:text-jf-text-primary hover:bg-jf-elevated transition-colors"
+                aria-label="Close navigation"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <NavContent {...sharedProps} onNavigate={() => setMobileOpen(false)} />
+          </nav>
+        </div>
+      )}
+    </>
   )
 }

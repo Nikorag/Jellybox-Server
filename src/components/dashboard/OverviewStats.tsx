@@ -58,21 +58,23 @@ export default function OverviewStats({
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
       {stats.map((stat) => {
         const inner = (
-          <CardContent className="py-4">
+          <CardContent className="py-5 flex flex-col justify-between min-h-[110px]">
             <p className="text-xs font-medium text-jf-text-muted uppercase tracking-wider mb-1.5">
               {stat.label}
             </p>
-            <p className="text-2xl font-bold text-jf-text-primary mb-1">{stat.value}</p>
-            {stat.sub}
+            <div>
+              <p className="text-2xl font-bold text-jf-text-primary mb-1 truncate">{stat.value}</p>
+              {stat.sub}
+            </div>
           </CardContent>
         )
 
         return stat.href ? (
-          <Link key={stat.label} href={stat.href}>
-            <Card hoverable>{inner}</Card>
+          <Link key={stat.label} href={stat.href} className="block h-full">
+            <Card hoverable className="h-full">{inner}</Card>
           </Link>
         ) : (
-          <Card key={stat.label}>{inner}</Card>
+          <Card key={stat.label} className="h-full">{inner}</Card>
         )
       })}
     </div>
