@@ -15,9 +15,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
         </Link>
         <div className="w-px h-5 bg-jf-border" />
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
-            <Image src="/Icon.png" alt="Jellybox" width={24} height={24} />
-          </div>
+          <Image src="/Icon.png" alt="Jellybox" width={24} height={24} className="flex-shrink-0" />
           <span className="font-semibold text-jf-text-primary text-sm">Jellybox</span>
         </Link>
         <span className="text-jf-text-muted text-sm">/</span>

@@ -1,5 +1,5 @@
 // ─── App ──────────────────────────────────────────────────────────────────────
-export const APP_NAME = 'Jellybox Server'
+export const APP_NAME = 'Jellybox'
 export const APP_DESCRIPTION =
   'Link your Jellyfin server and assign RFID tags to your media library.'
 

@@ -3,7 +3,7 @@ import type { Metadata } from 'next'
 import ResetPasswordForm from '@/components/auth/ResetPasswordForm'
 
 export const metadata: Metadata = {
-  title: 'Reset Password — Jellybox Server',
+  title: 'Reset Password — Jellybox',
 }
 
 export default function ResetPasswordPage() {

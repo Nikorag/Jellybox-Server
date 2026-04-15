@@ -8,11 +8,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       {/* Header */}
       <header className="px-6 py-5 border-b border-jf-border">
         <Link href="/" className="flex items-center gap-2 w-fit">
-          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0 overflow-hidden">
-            <Image src="/Icon.png" alt="Jellybox" width={32} height={32} />
-          </div>
+          <Image src="/Icon.png" alt="Jellybox" width={32} height={32} className="flex-shrink-0" />
           <span className="text-jf-text-primary font-semibold text-lg">
-            Jellybox Server
+            Jellybox
           </span>
         </Link>
       </header>
@@ -25,7 +23,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
       {/* Footer */}
       <footer className="px-6 py-4 border-t border-jf-border text-center">
         <p className="text-jf-text-muted text-sm">
-          © {new Date().getFullYear()} Jellybox Server
+          © {new Date().getFullYear()} Jellybox
         </p>
       </footer>
     </div>
