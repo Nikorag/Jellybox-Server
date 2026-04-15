@@ -10,7 +10,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Jellyfin-inspired dark palette
         jf: {
           bg: '#101010',
           surface: '#1c1c1c',
@@ -23,9 +22,11 @@ const config: Config = {
           'primary-hover': '#9b4db4',
           'primary-light': '#c47dd8',
           'primary-muted': 'rgba(170,92,195,0.15)',
-          // Accent — Jellyfin blue
-          accent: '#0086b0',
-          'accent-hover': '#0097c4',
+          // Secondary — Jellyfin blue
+          secondary: '#00A4DC',
+          'secondary-hover': '#0093c9',
+          'secondary-light': '#33b6e3',
+          'secondary-muted': 'rgba(0,164,220,0.15)',
           // Text
           'text-primary': '#ffffff',
           'text-secondary': '#aaaaaa',
@@ -42,7 +43,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-quicksand)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         DEFAULT: '0.5rem',

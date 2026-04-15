@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Quicksand } from 'next/font/google'
 import './globals.css'
 import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants'
 import SessionProvider from '@/components/SessionProvider'
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration'
 import { auth } from '@/auth'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const quicksand = Quicksand({ subsets: ['latin'], variable: '--font-quicksand' })
 
 export const metadata: Metadata = {
   title: {
@@ -40,7 +40,7 @@ export default async function RootLayout({
   const session = await auth()
 
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={quicksand.variable}>
       <body className="bg-jf-bg text-jf-text-primary antialiased">
         <ServiceWorkerRegistration />
         <SessionProvider session={session}>{children}</SessionProvider>

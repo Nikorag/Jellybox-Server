@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import StlModelViewerLoader from '@/components/docs/StlModelViewerLoader'
 
 export const metadata: Metadata = { title: 'Case & STL Files — Jellybox Docs' }
+
+const RAW_BASE = 'https://raw.githubusercontent.com/Nikorag/Jellybox-Firmware/main/models'
 
 export default function CasePage() {
   return (
@@ -17,29 +20,56 @@ export default function CasePage() {
         </p>
       </div>
 
-      {/* Coming soon */}
-      <div className="flex flex-col items-center justify-center text-center py-16 px-6 rounded-2xl border-2 border-dashed border-jf-border bg-jf-surface">
-        <div className="w-14 h-14 rounded-2xl bg-jf-elevated border border-jf-border flex items-center justify-center mb-5">
-          <svg className="w-7 h-7 text-jf-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-          </svg>
-        </div>
-        <h2 className="text-lg font-semibold text-jf-text-primary mb-2">STL files coming soon</h2>
-        <p className="text-sm text-jf-text-secondary max-w-sm leading-relaxed">
-          The case design is in progress. Files will be available to download here and linked from
-          the GitHub repository when ready.
-        </p>
+      {/* Interactive viewer */}
+      <StlModelViewerLoader />
+
+      {/* Download cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+        {[
+          {
+            label: 'Jellybox Case',
+            description: 'Main body — houses the ESP32, eInk display, NFC module, and NeoPixel ring. Includes the NFC pass-through area for scanning.',
+            href: `${RAW_BASE}/Jellybox%20Case.stl`,
+            filename: 'Jellybox Case.stl',
+          },
+          {
+            label: 'Jellybox Lid',
+            description: 'Top panel — screws onto the case body to enclose the electronics.',
+            href: `${RAW_BASE}/Jellybox%20Lid.stl`,
+            filename: 'Jellybox Lid.stl',
+          },
+        ].map((file) => (
+          <a
+            key={file.label}
+            href={file.href}
+            download={file.filename}
+            className="group flex items-start gap-4 p-5 rounded-xl border border-jf-border bg-jf-surface hover:border-jf-primary/50 hover:bg-jf-elevated transition-colors"
+          >
+            <div className="mt-0.5 w-10 h-10 shrink-0 rounded-lg bg-jf-elevated border border-jf-border flex items-center justify-center group-hover:border-jf-primary/40 transition-colors">
+              <svg className="w-5 h-5 text-jf-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              </svg>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-jf-text-primary group-hover:text-jf-primary transition-colors">
+                {file.label} <span className="text-jf-text-muted font-normal">.stl</span>
+              </p>
+              <p className="text-xs text-jf-text-secondary mt-0.5 leading-relaxed">{file.description}</p>
+              <p className="text-xs text-jf-primary mt-2 font-medium">Download →</p>
+            </div>
+          </a>
+        ))}
       </div>
 
       {/* What to expect */}
       <section className="mt-10">
-        <h2 className="text-base font-semibold text-jf-text-primary mb-4">What to expect</h2>
+        <h2 className="text-base font-semibold text-jf-text-primary mb-4">What&apos;s included</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             {
-              title: 'Two-part snap-fit shell',
-              description: 'Top and bottom halves that clip together without screws. Designed for FDM printing in PLA or PETG.',
+              title: 'Two-part screwed shell',
+              description: 'Case and lid are held together with screws. Designed for FDM printing in PLA or PETG.',
             },
             {
               title: 'eInk window',
@@ -47,7 +77,7 @@ export default function CasePage() {
             },
             {
               title: 'NFC pass-through',
-              description: 'The top face is thin over the PN532 antenna area so cards and tags can be scanned through the case.',
+              description: 'The case body is thin over the PN532 antenna area so cards and tags can be scanned through it.',
             },
             {
               title: 'LED diffuser ring',
@@ -56,10 +86,6 @@ export default function CasePage() {
             {
               title: 'USB cutout',
               description: 'Side opening for the ESP32\'s USB port so the device can be powered without disassembly.',
-            },
-            {
-              title: 'Wall mount option',
-              description: 'Optional keyhole slot on the back so the device can hang on a screw.',
             },
           ].map((item) => (
             <div key={item.title} className="p-4 rounded-xl border border-jf-border bg-jf-surface">
@@ -77,25 +103,10 @@ export default function CasePage() {
           <li><span className="font-medium text-jf-text-primary">Material:</span> PLA or PETG</li>
           <li><span className="font-medium text-jf-text-primary">Layer height:</span> 0.2 mm</li>
           <li><span className="font-medium text-jf-text-primary">Infill:</span> 20 % gyroid or grid</li>
-          <li><span className="font-medium text-jf-text-primary">Supports:</span> None required</li>
+          <li><span className="font-medium text-jf-text-primary">Supports:</span> Required (Jellybox logo)</li>
           <li><span className="font-medium text-jf-text-primary">Perimeters / walls:</span> 3</li>
         </ul>
       </section>
-
-      <div className="mt-8 pt-4 border-t border-jf-border">
-        <p className="text-sm text-jf-text-secondary">
-          Want to be notified when the STL files are released? Watch the{' '}
-          <a
-            href="https://github.com/Nikorag/Jellybox-firmware"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-jf-primary hover:underline"
-          >
-            firmware repository
-          </a>{' '}
-          on GitHub.
-        </p>
-      </div>
     </div>
   )
 }
