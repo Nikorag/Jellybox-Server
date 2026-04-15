@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { getActiveAccountId } from '@/lib/context'
 import { PageHeader } from '@/components/ui'
 import TagForm from '@/components/tags/TagForm'
 
@@ -12,13 +13,15 @@ export default async function EditTagPage({ params }: { params: Promise<{ id: st
   const session = await auth()
   if (!session?.user?.id) redirect('/auth/signin')
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const tag = await db.rfidTag.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId: accountId },
   })
   if (!tag) notFound()
 
   const server = await db.jellyfinServer.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
     select: { serverUrl: true },
   })
 

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
+import { getActiveAccountId } from '@/lib/context'
 import { PageHeader, Button, EmptyState } from '@/components/ui'
 import DeviceCard from '@/components/devices/DeviceCard'
 
@@ -12,8 +13,10 @@ export default async function DevicesPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/auth/signin')
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const devices = await db.device.findMany({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
     include: { defaultClient: true },
     orderBy: { createdAt: 'asc' },
   })

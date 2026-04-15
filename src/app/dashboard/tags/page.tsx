@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
+import { getActiveAccountId } from '@/lib/context'
 import { PageHeader, Button } from '@/components/ui'
 import TagGrid from '@/components/tags/TagGrid'
 
@@ -12,13 +13,15 @@ export default async function TagsPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/auth/signin')
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const tags = await db.rfidTag.findMany({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
     orderBy: { createdAt: 'desc' },
   })
 
   const server = await db.jellyfinServer.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
     select: { serverUrl: true },
   })
 

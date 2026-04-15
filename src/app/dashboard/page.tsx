@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { redirect } from 'next/navigation'
+import { getActiveAccountId } from '@/lib/context'
 import { ACTIVITY_LOG_PAGE_SIZE } from '@/lib/constants'
 import OverviewStats from '@/components/dashboard/OverviewStats'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
@@ -12,14 +13,14 @@ export default async function DashboardPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/auth/signin')
 
-  const userId = session.user.id
+  const accountId = await getActiveAccountId(session.user.id)
 
   const [server, deviceCount, tagCount, recentLogs] = await Promise.all([
-    db.jellyfinServer.findUnique({ where: { userId } }),
-    db.device.count({ where: { userId } }),
-    db.rfidTag.count({ where: { userId } }),
+    db.jellyfinServer.findUnique({ where: { userId: accountId } }),
+    db.device.count({ where: { userId: accountId } }),
+    db.rfidTag.count({ where: { userId: accountId } }),
     db.activityLog.findMany({
-      where: { userId },
+      where: { userId: accountId },
       orderBy: { createdAt: 'desc' },
       take: ACTIVITY_LOG_PAGE_SIZE,
       include: { device: { select: { name: true } } },

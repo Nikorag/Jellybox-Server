@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { getActiveAccountId } from '@/lib/context'
 import type { JellyfinItemType } from '@prisma/client'
 
 const createTagSchema = z.object({
@@ -25,6 +26,8 @@ export async function createTagAction(
   const session = await auth()
   if (!session?.user?.id) return { error: 'Unauthorised' }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const parsed = createTagSchema.safeParse({
     tagId: formData.get('tagId'),
     label: formData.get('label'),
@@ -34,7 +37,7 @@ export async function createTagAction(
   }
 
   const existing = await db.rfidTag.findFirst({
-    where: { userId: session.user.id, tagId: parsed.data.tagId },
+    where: { userId: accountId, tagId: parsed.data.tagId },
   })
   if (existing) {
     return { error: 'A tag with this ID is already registered.' }
@@ -42,7 +45,7 @@ export async function createTagAction(
 
   const tag = await db.rfidTag.create({
     data: {
-      userId: session.user.id,
+      userId: accountId,
       tagId: parsed.data.tagId,
       label: parsed.data.label,
     },
@@ -59,6 +62,8 @@ export async function updateTagAction(
   const session = await auth()
   if (!session?.user?.id) return { error: 'Unauthorised' }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const parsed = updateTagSchema.safeParse({
     label: formData.get('label') ?? undefined,
     jellyfinItemId: formData.get('jellyfinItemId') ?? undefined,
@@ -72,7 +77,7 @@ export async function updateTagAction(
   }
 
   await db.rfidTag.updateMany({
-    where: { id, userId: session.user.id },
+    where: { id, userId: accountId },
     data: {
       ...(parsed.data.label !== undefined && { label: parsed.data.label }),
       ...(parsed.data.jellyfinItemId !== undefined && {
@@ -94,8 +99,10 @@ export async function deleteTagAction(id: string): Promise<{ error?: string }> {
   const session = await auth()
   if (!session?.user?.id) return { error: 'Unauthorised' }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   await db.rfidTag.deleteMany({
-    where: { id, userId: session.user.id },
+    where: { id, userId: accountId },
   })
 
   revalidatePath('/dashboard/tags')

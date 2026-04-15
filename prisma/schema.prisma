@@ -25,13 +25,18 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  accounts       Account[]
-  sessions       Session[]
-  jellyfinServer JellyfinServer?
+  accounts        Account[]
+  sessions        Session[]
+  jellyfinServer  JellyfinServer?
   jellyfinClients JellyfinClient[]
-  devices        Device[]
-  rfidTags       RfidTag[]
-  activityLogs   ActivityLog[]
+  devices         Device[]
+  rfidTags        RfidTag[]
+  activityLogs    ActivityLog[]
+
+  // Partners: users this account owner has granted access to their data
+  ownedPartners   AccountPartner[] @relation("OwnedPartners")
+  // Partners: accounts this user has been granted access to
+  partnerAccess   AccountPartner[] @relation("PartnerAccess")
 
   @@map("users")
 }
@@ -195,6 +200,25 @@ model RfidTag {
   // A tag ID must be unique per user
   @@unique([userId, tagId])
   @@map("rfid_tags")
+}
+
+// ─── Account Partners ────────────────────────────────────────────────────────
+
+/// Grants partnerId read/write access to ownerId's tags and devices.
+/// Partners cannot access Jellyfin settings.
+model AccountPartner {
+  id        String   @id @default(cuid())
+  /// The account whose data is being shared
+  ownerId   String
+  /// The user being granted access
+  partnerId String
+  createdAt DateTime @default(now())
+
+  owner   User @relation("OwnedPartners", fields: [ownerId],   references: [id], onDelete: Cascade)
+  partner User @relation("PartnerAccess", fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, partnerId])
+  @@map("account_partners")
 }
 
 // ─── Activity Logs ───────────────────────────────────────────────────────────

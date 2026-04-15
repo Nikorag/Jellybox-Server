@@ -1,4 +1,4 @@
-import { createDeviceAction, deleteDeviceAction, rotateDeviceKeyAction } from '@/app/dashboard/devices/actions'
+import { createDeviceAction, deleteDeviceAction } from '@/app/dashboard/devices/actions'
 
 jest.mock('@/auth', () => ({ auth: jest.fn() }))
 jest.mock('@/lib/db', () => ({
@@ -19,6 +19,9 @@ jest.mock('@/lib/crypto', () => ({
   }),
 }))
 jest.mock('next/cache', () => ({ revalidatePath: jest.fn() }))
+jest.mock('@/lib/context', () => ({
+  getActiveAccountId: jest.fn().mockImplementation((id: string) => Promise.resolve(id)),
+}))
 
 const { auth } = jest.requireMock('@/auth')
 const { db } = jest.requireMock('@/lib/db')
@@ -76,18 +79,3 @@ describe('deleteDeviceAction', () => {
   })
 })
 
-describe('rotateDeviceKeyAction', () => {
-  it('rotates key and returns new rawKey', async () => {
-    db.device.findFirst.mockResolvedValue({ id: 'device-1' })
-    db.device.update.mockResolvedValue({})
-    const result = await rotateDeviceKeyAction('device-1')
-    expect(result.error).toBeUndefined()
-    expect(result.rawKey).toBe('jb_testrawkey')
-  })
-
-  it('returns error when device not found', async () => {
-    db.device.findFirst.mockResolvedValue(null)
-    const result = await rotateDeviceKeyAction('not-found')
-    expect(result.error).toBe('Device not found.')
-  })
-})

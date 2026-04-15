@@ -3,14 +3,18 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { signOut, useSession } from 'next-auth/react'
+import { signOut } from 'next-auth/react'
 import { cn } from '@/lib/utils'
 import Avatar from '@/components/ui/Avatar'
+import ContextSwitcher from './ContextSwitcher'
+
+type ContextAccount = { id: string; name: string | null; email: string }
 
 interface NavItem {
   href: string
   label: string
   icon: React.ReactNode
+  ownerOnly?: boolean
 }
 
 const navItems: NavItem[] = [
@@ -47,6 +51,7 @@ const navItems: NavItem[] = [
   {
     href: '/dashboard/jellyfin',
     label: 'Jellyfin',
+    ownerOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -57,6 +62,7 @@ const navItems: NavItem[] = [
   {
     href: '/dashboard/account',
     label: 'Account',
+    ownerOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
@@ -64,11 +70,36 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: '/dashboard/partners',
+    label: 'Partners',
+    ownerOnly: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
 ]
 
-export default function DashboardNav() {
+export default function DashboardNav({
+  partnerAccounts,
+  activeAccountId,
+  selfId,
+  selfName,
+  selfEmail,
+}: {
+  partnerAccounts: ContextAccount[]
+  activeAccountId: string
+  selfId: string
+  selfName: string | null
+  selfEmail: string
+}) {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const isPartnerContext = activeAccountId !== selfId
+
+  const visibleItems = navItems.filter((item) => !(item.ownerOnly && isPartnerContext))
 
   return (
     <nav
@@ -85,9 +116,20 @@ export default function DashboardNav() {
         </Link>
       </div>
 
+      {/* Context switcher — only shown when the user has accounts they can switch to */}
+      {partnerAccounts.length > 0 && (
+        <ContextSwitcher
+          partnerAccounts={partnerAccounts}
+          activeAccountId={activeAccountId}
+          selfId={selfId}
+          selfName={selfName}
+          selfEmail={selfEmail}
+        />
+      )}
+
       {/* Nav items */}
       <div className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map((item) => {
+        {visibleItems.map((item) => {
           const isActive =
             item.href === '/dashboard'
               ? pathname === '/dashboard'
@@ -117,12 +159,12 @@ export default function DashboardNav() {
       {/* User footer */}
       <div className="px-3 pb-4 border-t border-jf-border pt-3">
         <div className="flex items-center gap-3 px-2 py-2">
-          <Avatar name={session?.user?.name} src={session?.user?.image} size="sm" />
+          <Avatar name={selfName} size="sm" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-jf-text-primary truncate">
-              {session?.user?.name ?? 'User'}
+              {selfName ?? 'User'}
             </p>
-            <p className="text-xs text-jf-text-muted truncate">{session?.user?.email}</p>
+            <p className="text-xs text-jf-text-muted truncate">{selfEmail}</p>
           </div>
           <button
             type="button"

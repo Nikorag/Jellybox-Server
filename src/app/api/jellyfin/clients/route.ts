@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
+import { getActiveAccountId } from '@/lib/context'
 import { jellyfinGetSessions, JellyfinApiError } from '@/lib/jellyfin'
 
 export async function GET() {
@@ -10,8 +11,10 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const server = await db.jellyfinServer.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
   })
   if (!server) {
     return NextResponse.json({ error: 'No Jellyfin server linked.' }, { status: 404 })

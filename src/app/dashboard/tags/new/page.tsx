@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { getActiveAccountId } from '@/lib/context'
 import { PageHeader } from '@/components/ui'
 import TagForm from '@/components/tags/TagForm'
 
@@ -11,13 +12,15 @@ export default async function NewTagPage() {
   const session = await auth()
   if (!session?.user?.id) redirect('/auth/signin')
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const [server, devices] = await Promise.all([
     db.jellyfinServer.findUnique({
-      where: { userId: session.user.id },
+      where: { userId: accountId },
       select: { serverUrl: true },
     }),
     db.device.findMany({
-      where: { userId: session.user.id },
+      where: { userId: accountId },
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),

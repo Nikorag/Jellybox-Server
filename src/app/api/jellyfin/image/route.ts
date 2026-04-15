@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
+import { getActiveAccountId } from '@/lib/context'
 import { JELLYFIN_REQUEST_TIMEOUT_MS } from '@/lib/constants'
 
 export async function GET(req: Request) {
@@ -18,8 +19,10 @@ export async function GET(req: Request) {
     return new NextResponse('Missing itemId', { status: 400 })
   }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const server = await db.jellyfinServer.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
   })
   if (!server) {
     return new NextResponse('No Jellyfin server linked', { status: 404 })

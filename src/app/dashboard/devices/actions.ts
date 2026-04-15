@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { generateDeviceApiKey } from '@/lib/crypto'
+import { getActiveAccountId } from '@/lib/context'
 
 const createDeviceSchema = z.object({
   name: z.string().min(1, 'Device name is required').max(64),
@@ -26,6 +27,8 @@ export async function createDeviceAction(
   const session = await auth()
   if (!session?.user?.id) return { error: 'Unauthorised' }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const parsed = createDeviceSchema.safeParse({ name: formData.get('name') })
   if (!parsed.success) {
     return { error: parsed.error.errors[0]?.message ?? 'Invalid input.' }
@@ -35,7 +38,7 @@ export async function createDeviceAction(
 
   const device = await db.device.create({
     data: {
-      userId: session.user.id,
+      userId: accountId,
       name: parsed.data.name,
       apiKeyHash: hash,
       apiKeyPrefix: prefix,
@@ -53,6 +56,8 @@ export async function updateDeviceAction(
   const session = await auth()
   if (!session?.user?.id) return { error: 'Unauthorised' }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const parsed = updateDeviceSchema.safeParse({
     name: formData.get('name') ?? undefined,
     defaultClientId: formData.get('defaultClientId') ?? undefined,
@@ -63,7 +68,7 @@ export async function updateDeviceAction(
   }
 
   await db.device.updateMany({
-    where: { id: deviceId, userId: session.user.id },
+    where: { id: deviceId, userId: accountId },
     data: {
       ...(parsed.data.name !== undefined && { name: parsed.data.name }),
       ...(parsed.data.defaultClientId !== undefined && {
@@ -83,8 +88,10 @@ export async function deleteDeviceAction(
   const session = await auth()
   if (!session?.user?.id) return { error: 'Unauthorised' }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   await db.device.deleteMany({
-    where: { id: deviceId, userId: session.user.id },
+    where: { id: deviceId, userId: accountId },
   })
 
   revalidatePath('/dashboard/devices')

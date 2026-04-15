@@ -8,11 +8,13 @@ const { auth } = NextAuth(authConfig)
 
 const PUBLIC_PATHS = [
   '/',
+  '/docs',
   '/auth/signin',
   '/auth/signup',
   '/auth/verify-email',
   '/auth/forgot-password',
   '/auth/reset-password',
+  '/api/auth',
   '/api/play',
   '/api/device/me',
   '/api/health',
@@ -21,8 +23,8 @@ const PUBLIC_PATHS = [
 export default auth((req: NextRequest & { auth: { user?: unknown } | null }) => {
   const { pathname } = req.nextUrl
 
-  // Allow public paths
-  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path + '?'))) {
+  // Allow public paths (exact match, query string variant, or sub-path)
+  if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(path + '?') || pathname.startsWith(path + '/'))) {
     return NextResponse.next()
   }
 

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/crypto'
+import { getActiveAccountId } from '@/lib/context'
 import { jellyfinBrowseLibrary, JellyfinApiError, type JellyfinItemType } from '@/lib/jellyfin'
 import { JELLYFIN_LIBRARY_PAGE_SIZE } from '@/lib/constants'
 
@@ -19,8 +20,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
   }
 
+  const accountId = await getActiveAccountId(session.user.id)
+
   const server = await db.jellyfinServer.findUnique({
-    where: { userId: session.user.id },
+    where: { userId: accountId },
   })
   if (!server) {
     return NextResponse.json({ error: 'No Jellyfin server linked.' }, { status: 404 })
