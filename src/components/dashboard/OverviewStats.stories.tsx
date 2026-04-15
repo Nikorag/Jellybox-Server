@@ -17,6 +17,7 @@ export const Connected: Story = {
       userId: 'user-1',
       serverUrl: 'https://jellyfin.example.com',
       apiToken: 'encrypted',
+      customHeaders: null,
       serverId: 'srv-1',
       serverName: 'Home Media Server',
       status: 'CONNECTED',
