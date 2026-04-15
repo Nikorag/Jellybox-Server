@@ -29,7 +29,7 @@ export default function TagCard({
 
   const imageUrl =
     jellyfinServerUrl && tag.jellyfinItemId && tag.jellyfinItemImageTag
-      ? getJellyfinImageUrl(jellyfinServerUrl, tag.jellyfinItemId, tag.jellyfinItemImageTag)
+      ? getJellyfinImageUrl(jellyfinServerUrl, tag.jellyfinItemId, tag.jellyfinItemImageTag, 600)
       : null
 
   async function handleDelete() {
@@ -43,7 +43,14 @@ export default function TagCard({
         {/* Artwork */}
         <div className="aspect-[2/3] bg-jf-elevated relative">
           {imageUrl ? (
-            <Image src={imageUrl} alt={tag.jellyfinItemTitle ?? tag.label} fill className="object-cover" />
+            <Image
+              src={imageUrl}
+              alt={tag.jellyfinItemTitle ?? tag.label}
+              fill
+              sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 180px"
+              className="object-cover"
+              unoptimized
+            />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <svg className="w-10 h-10 text-jf-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
