@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
+import { decrypt } from '@/lib/crypto'
 import { redirect } from 'next/navigation'
 import { isOwnContext } from '@/lib/context'
 import { PageHeader } from '@/components/ui'
@@ -18,6 +19,15 @@ export default async function JellyfinPage() {
     where: { userId: session.user.id },
   })
 
+  let currentHeaders: Record<string, string> = {}
+  if (server?.customHeaders) {
+    try {
+      currentHeaders = JSON.parse(decrypt(server.customHeaders)) as Record<string, string>
+    } catch {
+      // ignore — treat as empty if decrypt fails
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -26,7 +36,7 @@ export default async function JellyfinPage() {
       />
 
       {server ? (
-        <JellyfinStatusCard server={server} />
+        <JellyfinStatusCard server={server} currentHeaders={currentHeaders} />
       ) : (
         <JellyfinConnectForm />
       )}

@@ -101,7 +101,9 @@ model JellyfinServer {
   userId     String               @unique
   serverUrl  String
   /// AES-256-GCM encrypted Jellyfin API token (format: iv:authTag:ciphertext, all hex)
-  apiToken   String
+  apiToken      String
+  /// AES-256-GCM encrypted JSON object of custom HTTP headers sent with every Jellyfin request
+  customHeaders String?
   serverId   String?
   serverName String?
   status     JellyfinServerStatus @default(UNKNOWN)

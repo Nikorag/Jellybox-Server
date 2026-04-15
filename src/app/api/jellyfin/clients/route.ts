@@ -5,6 +5,11 @@ import { decrypt } from '@/lib/crypto'
 import { getActiveAccountId } from '@/lib/context'
 import { jellyfinGetSessions, JellyfinApiError } from '@/lib/jellyfin'
 
+function decryptCustomHeaders(encrypted: string | null): Record<string, string> {
+  if (!encrypted) return {}
+  try { return JSON.parse(decrypt(encrypted)) as Record<string, string> } catch { return {} }
+}
+
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) {
@@ -22,7 +27,8 @@ export async function GET() {
 
   try {
     const apiToken = decrypt(server.apiToken)
-    const sessions = await jellyfinGetSessions(server.serverUrl, apiToken)
+    const customHeaders = decryptCustomHeaders(server.customHeaders)
+    const sessions = await jellyfinGetSessions(server.serverUrl, apiToken, customHeaders)
 
     // Filter to sessions that have a DeviceId (i.e. actual playback clients)
     const clients = sessions

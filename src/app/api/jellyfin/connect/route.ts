@@ -9,17 +9,23 @@ import {
   JellyfinApiError,
 } from '@/lib/jellyfin'
 
+const customHeadersSchema = z
+  .record(z.string().min(1), z.string())
+  .optional()
+
 const connectSchema = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('credentials'),
     serverUrl: z.string().url('Invalid server URL'),
     username: z.string().min(1),
     password: z.string().min(1),
+    customHeaders: customHeadersSchema,
   }),
   z.object({
     mode: z.literal('apikey'),
     serverUrl: z.string().url('Invalid server URL'),
     apiKey: z.string().min(1),
+    customHeaders: customHeadersSchema,
   }),
 ])
 
@@ -39,6 +45,7 @@ export async function POST(req: Request) {
   }
 
   const { serverUrl } = parsed.data
+  const customHeaders = parsed.data.customHeaders ?? {}
   let apiToken: string
 
   try {
@@ -47,6 +54,7 @@ export async function POST(req: Request) {
         serverUrl,
         parsed.data.username,
         parsed.data.password,
+        customHeaders,
       )
       apiToken = auth.AccessToken
     } else {
@@ -54,8 +62,12 @@ export async function POST(req: Request) {
     }
 
     // Validate the token + retrieve server info
-    const sysInfo = await jellyfinGetSystemInfo(serverUrl, apiToken)
+    const sysInfo = await jellyfinGetSystemInfo(serverUrl, apiToken, customHeaders)
     const encryptedToken = encrypt(apiToken)
+    const encryptedHeaders =
+      Object.keys(customHeaders).length > 0
+        ? encrypt(JSON.stringify(customHeaders))
+        : null
 
     await db.jellyfinServer.upsert({
       where: { userId: session.user.id },
@@ -63,6 +75,7 @@ export async function POST(req: Request) {
         userId: session.user.id,
         serverUrl,
         apiToken: encryptedToken,
+        customHeaders: encryptedHeaders,
         serverId: sysInfo.Id,
         serverName: sysInfo.ServerName,
         status: 'CONNECTED',
@@ -71,6 +84,7 @@ export async function POST(req: Request) {
       update: {
         serverUrl,
         apiToken: encryptedToken,
+        customHeaders: encryptedHeaders,
         serverId: sysInfo.Id,
         serverName: sysInfo.ServerName,
         status: 'CONNECTED',

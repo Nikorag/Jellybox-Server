@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { JellyfinServer } from '@prisma/client'
 import { Card, CardContent, CardFooter, Button, StatusIndicator, ConfirmDialog } from '@/components/ui'
-import { unlinkJellyfinServerAction } from '@/app/dashboard/jellyfin/actions'
+import { unlinkJellyfinServerAction, saveCustomHeadersAction, testJellyfinConnectionAction } from '@/app/dashboard/jellyfin/actions'
+import CustomHeadersEditor from './CustomHeadersEditor'
 import { formatRelativeTime } from '@/lib/utils'
 import type { StatusType } from '@/components/ui/StatusIndicator'
 
@@ -16,12 +17,34 @@ const statusMap: Record<string, { type: StatusType; label: string }> = {
   UNKNOWN: { type: 'neutral', label: 'Unknown' },
 }
 
-export default function JellyfinStatusCard({ server }: { server: JellyfinServer }) {
+export default function JellyfinStatusCard({
+  server,
+  currentHeaders,
+}: {
+  server: JellyfinServer
+  currentHeaders: Record<string, string>
+}) {
   const router = useRouter()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [unlinking, setUnlinking] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   const statusInfo = statusMap[server.status] ?? statusMap.UNKNOWN
+
+  async function handleTest() {
+    setTesting(true)
+    setTestResult(null)
+    const result = await testJellyfinConnectionAction()
+    setTesting(false)
+    setTestResult({
+      ok: result.ok,
+      message: result.ok
+        ? `Connected to ${result.serverName}`
+        : (result.error ?? 'Connection failed.'),
+    })
+    router.refresh()
+  }
 
   async function handleUnlink() {
     setUnlinking(true)
@@ -52,13 +75,29 @@ export default function JellyfinStatusCard({ server }: { server: JellyfinServer 
             </Button>
           </div>
 
-          {server.lastCheckedAt && (
-            <p className="mt-4 text-xs text-jf-text-muted">
-              Last checked {formatRelativeTime(server.lastCheckedAt)}
-            </p>
-          )}
+          <div className="mt-4 flex items-center gap-3 flex-wrap">
+            {server.lastCheckedAt && (
+              <p className="text-xs text-jf-text-muted">
+                Last checked {formatRelativeTime(server.lastCheckedAt)}
+              </p>
+            )}
+            {testResult && (
+              <p className={`text-xs font-medium ${testResult.ok ? 'text-jf-success' : 'text-jf-error'}`}>
+                {testResult.ok ? '✓' : '✗'} {testResult.message}
+              </p>
+            )}
+          </div>
+
+          <CustomHeadersEditor
+            initialHeaders={currentHeaders}
+            onSave={saveCustomHeadersAction}
+            standalone
+          />
         </CardContent>
-        <CardFooter className="flex gap-2">
+        <CardFooter className="flex gap-2 flex-wrap">
+          <Button variant="secondary" size="sm" loading={testing} onClick={handleTest}>
+            Test connection
+          </Button>
           <Link href="/dashboard/jellyfin/clients">
             <Button variant="secondary" size="sm">
               Manage Clients

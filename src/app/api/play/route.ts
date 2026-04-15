@@ -141,7 +141,10 @@ export async function POST(req: Request) {
 
   try {
     const apiToken = decrypt(server.apiToken)
-    const sessions = await jellyfinGetSessions(server.serverUrl, apiToken)
+    const customHeaders = server.customHeaders
+      ? (() => { try { return JSON.parse(decrypt(server.customHeaders!)) as Record<string, string> } catch { return {} } })()
+      : {}
+    const sessions = await jellyfinGetSessions(server.serverUrl, apiToken, customHeaders)
 
     // Resolve live session by matching DeviceId
     // SupportsRemoteControl may be absent for some clients — don't exclude on undefined
@@ -169,7 +172,7 @@ export async function POST(req: Request) {
     let playItemTitle = tag.jellyfinItemTitle ?? undefined
 
     if (tag.jellyfinItemType === 'SERIES') {
-      const episode = await jellyfinGetRandomEpisode(server.serverUrl, apiToken, tag.jellyfinItemId)
+      const episode = await jellyfinGetRandomEpisode(server.serverUrl, apiToken, tag.jellyfinItemId, customHeaders)
       if (!episode) {
         await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, PLAY_ERROR.OFFLINE)
         return NextResponse.json(
@@ -188,7 +191,7 @@ export async function POST(req: Request) {
       itemTitle: playItemTitle,
       seriesId: tag.jellyfinItemType === 'SERIES' ? tag.jellyfinItemId : undefined,
     })
-    await jellyfinPlay(server.serverUrl, apiToken, liveSession.Id, playItemId)
+    await jellyfinPlay(server.serverUrl, apiToken, liveSession.Id, playItemId, customHeaders)
 
     await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
 

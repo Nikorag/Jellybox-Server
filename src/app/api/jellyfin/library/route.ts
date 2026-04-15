@@ -7,6 +7,11 @@ import { getActiveAccountId } from '@/lib/context'
 import { jellyfinBrowseLibrary, JellyfinApiError, type JellyfinItemType } from '@/lib/jellyfin'
 import { JELLYFIN_LIBRARY_PAGE_SIZE } from '@/lib/constants'
 
+function decryptCustomHeaders(encrypted: string | null): Record<string, string> {
+  if (!encrypted) return {}
+  try { return JSON.parse(decrypt(encrypted)) as Record<string, string> } catch { return {} }
+}
+
 const querySchema = z.object({
   search: z.string().optional(),
   types: z.string().optional(),
@@ -42,12 +47,13 @@ export async function GET(req: Request) {
 
   try {
     const apiToken = decrypt(server.apiToken)
+    const customHeaders = decryptCustomHeaders(server.customHeaders)
     const result = await jellyfinBrowseLibrary(server.serverUrl, apiToken, {
       search,
       types: typeList,
       startIndex,
       limit,
-    })
+    }, customHeaders)
     return NextResponse.json({ data: result })
   } catch (err) {
     if (err instanceof JellyfinApiError) {

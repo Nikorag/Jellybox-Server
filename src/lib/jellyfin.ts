@@ -56,6 +56,7 @@ async function jellyfinFetch<T>(
   path: string,
   apiToken: string,
   options?: RequestInit,
+  customHeaders?: Record<string, string>,
 ): Promise<T> {
   const base = serverUrl.replace(/\/$/, '')
   const controller = new AbortController()
@@ -65,6 +66,8 @@ async function jellyfinFetch<T>(
     const res = await fetch(`${base}${path}`, {
       ...options,
       headers: {
+        // Custom headers first — they are additive (e.g. Cloudflare Access tokens)
+        ...(customHeaders ?? {}),
         'X-Emby-Authorization': `MediaBrowser Token="${apiToken}"`,
         'Content-Type': 'application/json',
         ...(options?.headers ?? {}),
@@ -116,6 +119,7 @@ export async function jellyfinAuthenticate(
   serverUrl: string,
   username: string,
   password: string,
+  customHeaders?: Record<string, string>,
 ): Promise<JellyfinAuthResult> {
   const base = serverUrl.replace(/\/$/, '')
   const controller = new AbortController()
@@ -125,6 +129,7 @@ export async function jellyfinAuthenticate(
     const res = await fetch(`${base}/Users/AuthenticateByName`, {
       method: 'POST',
       headers: {
+        ...(customHeaders ?? {}),
         'X-Emby-Authorization':
           'MediaBrowser Client="Jellybox Server", Device="Jellybox Server", DeviceId="jellybox-server", Version="1.0.0"',
         'Content-Type': 'application/json',
@@ -156,16 +161,18 @@ export async function jellyfinAuthenticate(
 export async function jellyfinGetSystemInfo(
   serverUrl: string,
   apiToken: string,
+  customHeaders?: Record<string, string>,
 ): Promise<JellyfinSystemInfo> {
-  return jellyfinFetch<JellyfinSystemInfo>(serverUrl, '/System/Info', apiToken)
+  return jellyfinFetch<JellyfinSystemInfo>(serverUrl, '/System/Info', apiToken, undefined, customHeaders)
 }
 
 /** Fetch active Jellyfin sessions (playback clients). */
 export async function jellyfinGetSessions(
   serverUrl: string,
   apiToken: string,
+  customHeaders?: Record<string, string>,
 ): Promise<JellyfinSession[]> {
-  return jellyfinFetch<JellyfinSession[]>(serverUrl, '/Sessions', apiToken)
+  return jellyfinFetch<JellyfinSession[]>(serverUrl, '/Sessions', apiToken, undefined, customHeaders)
 }
 
 /** Browse the Jellyfin media library with optional search and type filter. */
@@ -178,6 +185,7 @@ export async function jellyfinBrowseLibrary(
     startIndex?: number
     limit?: number
   } = {},
+  customHeaders?: Record<string, string>,
 ): Promise<JellyfinLibraryResult> {
   const params = new URLSearchParams({
     Recursive: 'true',
@@ -197,6 +205,8 @@ export async function jellyfinBrowseLibrary(
     serverUrl,
     `/Items?${params.toString()}`,
     apiToken,
+    undefined,
+    customHeaders,
   )
 }
 
@@ -208,6 +218,7 @@ export async function jellyfinGetRandomEpisode(
   serverUrl: string,
   apiToken: string,
   seriesId: string,
+  customHeaders?: Record<string, string>,
 ): Promise<JellyfinItem | null> {
   const params = new URLSearchParams({
     ParentId: seriesId,
@@ -221,6 +232,8 @@ export async function jellyfinGetRandomEpisode(
     serverUrl,
     `/Items?${params}`,
     apiToken,
+    undefined,
+    customHeaders,
   )
   return result.Items[0] ?? null
 }
@@ -231,6 +244,7 @@ export async function jellyfinPlay(
   apiToken: string,
   sessionId: string,
   itemId: string,
+  customHeaders?: Record<string, string>,
 ): Promise<void> {
   const params = new URLSearchParams({
     PlayCommand: 'PlayNow',
@@ -240,5 +254,5 @@ export async function jellyfinPlay(
   })
   const path = `/Sessions/${sessionId}/Playing?${params}`
   console.log('[jellyfin] play request:', path)
-  await jellyfinFetch<void>(serverUrl, path, apiToken, { method: 'POST' })
+  await jellyfinFetch<void>(serverUrl, path, apiToken, { method: 'POST' }, customHeaders)
 }

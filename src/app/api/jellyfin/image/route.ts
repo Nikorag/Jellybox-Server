@@ -29,6 +29,9 @@ export async function GET(req: Request) {
   }
 
   const apiToken = decrypt(server.apiToken)
+  const customHeaders = server.customHeaders
+    ? (() => { try { return JSON.parse(decrypt(server.customHeaders!)) as Record<string, string> } catch { return {} } })()
+    : {}
   const base = server.serverUrl.replace(/\/$/, '')
   const imageUrl = tag
     ? `${base}/Items/${itemId}/Images/Primary?tag=${tag}`
@@ -39,7 +42,7 @@ export async function GET(req: Request) {
 
   try {
     const upstream = await fetch(imageUrl, {
-      headers: { 'X-Emby-Token': apiToken },
+      headers: { ...customHeaders, 'X-Emby-Token': apiToken },
       signal: controller.signal,
     })
 

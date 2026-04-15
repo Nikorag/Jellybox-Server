@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Input, Card, CardContent } from '@/components/ui'
+import CustomHeadersEditor from './CustomHeadersEditor'
 
 type Mode = 'credentials' | 'apikey'
 
@@ -13,6 +14,8 @@ export default function JellyfinConnectForm() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [customHeaders, setCustomHeaders] = useState<Record<string, string>>({})
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -23,8 +26,8 @@ export default function JellyfinConnectForm() {
 
     const body =
       mode === 'credentials'
-        ? { mode, serverUrl, username, password }
-        : { mode, serverUrl, apiKey }
+        ? { mode, serverUrl, username, password, customHeaders }
+        : { mode, serverUrl, apiKey, customHeaders }
 
     const res = await fetch('/api/jellyfin/connect', {
       method: 'POST',
@@ -117,6 +120,32 @@ export default function JellyfinConnectForm() {
               helperText="Find this in Jellyfin → Dashboard → API Keys."
             />
           )}
+
+          {/* Advanced — custom headers */}
+          <div className="border-t border-jf-border pt-4">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-jf-text-muted hover:text-jf-text-primary transition-colors"
+            >
+              <svg
+                className={`w-3.5 h-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              Advanced
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3">
+                <CustomHeadersEditor
+                  initialHeaders={customHeaders}
+                  onSave={async (h) => { setCustomHeaders(h) }}
+                />
+              </div>
+            )}
+          </div>
 
           <Button type="submit" loading={isPending} className="w-full">
             Connect to Jellyfin
