@@ -13,6 +13,7 @@ type Story = StoryObj<typeof DeviceCard>
 export const WithClient: Story = {
   args: {
     device: {
+      lastPlayedAt: new Date(),
       id: 'device-1',
       userId: 'user-1',
       name: 'Living Room Box',
@@ -42,6 +43,7 @@ export const WithClient: Story = {
 export const NoClient: Story = {
   args: {
     device: {
+      lastPlayedAt: new Date(),
       id: 'device-2',
       userId: 'user-1',
       name: 'Kids Bedroom Box',
