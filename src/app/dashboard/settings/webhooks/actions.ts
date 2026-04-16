@@ -5,12 +5,17 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 
+const RETRY_EVENTS = ['JELLYFIN_OFFLINE'] as const
+
 const createWebhookSchema = z.object({
   label: z.string().min(1, 'Label is required').max(64),
   url: z.string().url('Must be a valid URL'),
-  event: z.enum(['JELLYFIN_OFFLINE']),
-  retryDelaySeconds: z.number().int().min(5).max(55),
-})
+  event: z.enum(['JELLYFIN_OFFLINE', 'TAG_SCANNED', 'PLAYBACK_FAILED']),
+  retryDelaySeconds: z.number().int().min(0).max(55),
+}).refine(
+  (d) => !RETRY_EVENTS.includes(d.event as typeof RETRY_EVENTS[number]) || d.retryDelaySeconds >= 5,
+  { message: 'Retry delay must be at least 5 seconds for Jellyfin Offline webhooks', path: ['retryDelaySeconds'] },
+)
 
 export async function createWebhookAction(
   data: z.infer<typeof createWebhookSchema>,

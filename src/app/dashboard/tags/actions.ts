@@ -18,6 +18,8 @@ const updateTagSchema = z.object({
   jellyfinItemType: z.string().nullable().optional(),
   jellyfinItemTitle: z.string().nullable().optional(),
   jellyfinItemImageTag: z.string().nullable().optional(),
+  resumePlayback: z.boolean().optional(),
+  shuffle: z.boolean().optional(),
 })
 
 export async function createTagAction(
@@ -70,6 +72,8 @@ export async function updateTagAction(
     jellyfinItemType: formData.get('jellyfinItemType') ?? undefined,
     jellyfinItemTitle: formData.get('jellyfinItemTitle') ?? undefined,
     jellyfinItemImageTag: formData.get('jellyfinItemImageTag') ?? undefined,
+    resumePlayback: formData.get('resumePlayback') === 'true' ? true : formData.get('resumePlayback') === 'false' ? false : undefined,
+    shuffle: formData.get('shuffle') === 'true' ? true : formData.get('shuffle') === 'false' ? false : undefined,
   })
 
   if (!parsed.success) {
@@ -87,6 +91,8 @@ export async function updateTagAction(
         jellyfinItemTitle: parsed.data.jellyfinItemTitle ?? null,
         jellyfinItemImageTag: parsed.data.jellyfinItemImageTag ?? null,
       }),
+      ...(parsed.data.resumePlayback !== undefined && { resumePlayback: parsed.data.resumePlayback }),
+      ...(parsed.data.shuffle !== undefined && { shuffle: parsed.data.shuffle }),
     },
   })
 

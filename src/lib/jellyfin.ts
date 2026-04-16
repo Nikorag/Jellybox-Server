@@ -29,6 +29,7 @@ export interface JellyfinSession {
   DeviceId: string
   DeviceName: string
   Client: string
+  UserId?: string
   UserName?: string
   NowPlayingItem?: { Name: string }
   LastActivityDate: string
@@ -238,6 +239,37 @@ export async function jellyfinGetRandomEpisode(
   return result.Items[0] ?? null
 }
 
+/**
+ * Get the next unplayed episode for a user in a series, sorted by season/episode order.
+ * Falls back to a random episode if the user has watched everything or has no watch history.
+ */
+export async function jellyfinGetNextEpisode(
+  serverUrl: string,
+  apiToken: string,
+  seriesId: string,
+  userId: string,
+  customHeaders?: Record<string, string>,
+): Promise<JellyfinItem | null> {
+  const params = new URLSearchParams({
+    UserId: userId,
+    IsPlayed: 'false',
+    Limit: '1',
+    SortBy: 'ParentIndexNumber,IndexNumber',
+    SortOrder: 'Ascending',
+    Fields: 'ImageTags',
+  })
+  const result = await jellyfinFetch<JellyfinLibraryResult>(
+    serverUrl,
+    `/Shows/${seriesId}/Episodes?${params}`,
+    apiToken,
+    undefined,
+    customHeaders,
+  )
+  if (result.Items[0]) return result.Items[0]
+  // All episodes watched — fall back to random
+  return jellyfinGetRandomEpisode(serverUrl, apiToken, seriesId, customHeaders)
+}
+
 /** Trigger playback on a specific Jellyfin session. */
 export async function jellyfinPlay(
   serverUrl: string,
@@ -245,9 +277,10 @@ export async function jellyfinPlay(
   sessionId: string,
   itemId: string,
   customHeaders?: Record<string, string>,
+  playCommand: 'PlayNow' | 'PlayShuffle' = 'PlayNow',
 ): Promise<void> {
   const params = new URLSearchParams({
-    PlayCommand: 'PlayNow',
+    PlayCommand: playCommand,
     ItemIds: itemId,
     MediaSourceId: itemId,
     StartPositionTicks: '0',

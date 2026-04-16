@@ -5,14 +5,27 @@ import type { Webhook } from '@prisma/client'
 import { Card, CardContent, CardHeader, Button, Input, ConfirmDialog } from '@/components/ui'
 import { createWebhookAction, deleteWebhookAction } from '@/app/dashboard/settings/webhooks/actions'
 
-const EVENT_LABELS: Record<string, string> = {
+type WebhookEventKey = 'JELLYFIN_OFFLINE' | 'TAG_SCANNED' | 'PLAYBACK_FAILED'
+
+const EVENT_LABELS: Record<WebhookEventKey, string> = {
   JELLYFIN_OFFLINE: 'Jellyfin offline',
+  TAG_SCANNED: 'Tag scanned',
+  PLAYBACK_FAILED: 'Playback failed',
 }
+
+const EVENT_DESCRIPTIONS: Record<WebhookEventKey, string> = {
+  JELLYFIN_OFFLINE: 'Fires when Jellyfin is unreachable. After the retry delay, playback is attempted again.',
+  TAG_SCANNED: 'Fires on every successful scan. The request body includes device name and content title.',
+  PLAYBACK_FAILED: 'Fires when a scan fails after all retries. The request body includes the error code.',
+}
+
+const RETRY_EVENTS: WebhookEventKey[] = ['JELLYFIN_OFFLINE']
 
 export default function WebhooksSettings({ webhooks: initial }: { webhooks: Webhook[] }) {
   const [webhooks, setWebhooks] = useState(initial)
   const [label, setLabel] = useState('')
   const [url, setUrl] = useState('')
+  const [event, setEvent] = useState<WebhookEventKey>('JELLYFIN_OFFLINE')
   const [retryDelay, setRetryDelay] = useState(30)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -26,8 +39,8 @@ export default function WebhooksSettings({ webhooks: initial }: { webhooks: Webh
     const res = await createWebhookAction({
       label,
       url,
-      event: 'JELLYFIN_OFFLINE',
-      retryDelaySeconds: retryDelay,
+      event,
+      retryDelaySeconds: RETRY_EVENTS.includes(event) ? retryDelay : 0,
     })
     setSaving(false)
     if (res.error) {
@@ -36,6 +49,7 @@ export default function WebhooksSettings({ webhooks: initial }: { webhooks: Webh
       setMessage({ type: 'success', text: 'Webhook created.' })
       setLabel('')
       setUrl('')
+      setEvent('JELLYFIN_OFFLINE')
       setRetryDelay(30)
       // Optimistic — page will revalidate on next visit
       window.location.reload()
@@ -114,28 +128,36 @@ export default function WebhooksSettings({ webhooks: initial }: { webhooks: Webh
               <label className="block text-xs font-medium text-jf-text-secondary mb-1.5">
                 Event
               </label>
-              <div className="px-3 py-2 rounded-lg border border-jf-border bg-jf-elevated text-sm text-jf-text-primary">
-                Jellyfin offline
+              <select
+                value={event}
+                onChange={(e) => setEvent(e.target.value as WebhookEventKey)}
+                className="form-select w-full rounded-lg border border-jf-border bg-jf-elevated text-sm text-jf-text-primary focus:border-jf-primary focus:ring-jf-primary/30"
+              >
+                {(Object.keys(EVENT_LABELS) as WebhookEventKey[]).map((key) => (
+                  <option key={key} value={key}>{EVENT_LABELS[key]}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-jf-text-muted">{EVENT_DESCRIPTIONS[event]}</p>
+            </div>
+            {RETRY_EVENTS.includes(event) && (
+              <div>
+                <label className="block text-xs font-medium text-jf-text-secondary mb-1.5">
+                  Retry delay: {retryDelay}s
+                </label>
+                <input
+                  type="range"
+                  min={5}
+                  max={55}
+                  step={5}
+                  value={retryDelay}
+                  onChange={(e) => setRetryDelay(Number(e.target.value))}
+                  className="w-full accent-jf-primary"
+                />
+                <p className="mt-1 text-xs text-jf-text-muted">
+                  How long to wait after firing the webhook before retrying playback.
+                </p>
               </div>
-              <p className="mt-1 text-xs text-jf-text-muted">More events coming soon.</p>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-jf-text-secondary mb-1.5">
-                Retry delay: {retryDelay}s
-              </label>
-              <input
-                type="range"
-                min={5}
-                max={55}
-                step={5}
-                value={retryDelay}
-                onChange={(e) => setRetryDelay(Number(e.target.value))}
-                className="w-full accent-jf-primary"
-              />
-              <p className="mt-1 text-xs text-jf-text-muted">
-                How long to wait after firing the webhook before retrying playback.
-              </p>
-            </div>
+            )}
             <Button type="submit" loading={saving}>Add webhook</Button>
           </form>
         </CardContent>
@@ -146,7 +168,7 @@ export default function WebhooksSettings({ webhooks: initial }: { webhooks: Webh
         onClose={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
         title="Remove webhook?"
-        description={`This will permanently remove "${deleteTarget?.label}". It will no longer be called when Jellyfin is offline.`}
+        description={`This will permanently remove "${deleteTarget?.label}".`}
         confirmLabel="Remove"
         loading={deleting}
       />

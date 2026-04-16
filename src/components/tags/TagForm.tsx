@@ -37,6 +37,8 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
         }
       : null,
   )
+  const [resumePlayback, setResumePlayback] = useState(tag?.resumePlayback ?? false)
+  const [shuffle, setShuffle] = useState(tag?.shuffle ?? false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [isPending, setIsPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -135,6 +137,8 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
       fd.set('jellyfinItemTitle', selectedItem.Name)
       fd.set('jellyfinItemImageTag', selectedItem.ImageTags?.Primary ?? '')
     }
+    fd.set('resumePlayback', String(resumePlayback))
+    fd.set('shuffle', String(shuffle))
 
     const res =
       mode === 'create'
@@ -272,6 +276,47 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
                 </Button>
               )}
             </div>
+
+            {/* Playback options — only shown when content is selected */}
+            {selectedItem && (
+              <div className="space-y-2 pt-1">
+                <p className="text-xs font-medium text-jf-text-secondary">Playback options</p>
+                <div className="rounded-lg border border-jf-border bg-jf-elevated p-3 space-y-3">
+                  {/* Resume — only meaningful for series */}
+                  {selectedItem.Type === 'Series' && (
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={resumePlayback}
+                        onChange={(e) => setResumePlayback(e.target.checked)}
+                        className="mt-0.5 rounded accent-jf-primary"
+                      />
+                      <div>
+                        <p className="text-sm text-jf-text-primary leading-snug">Resume from next episode</p>
+                        <p className="text-xs text-jf-text-muted">Plays the next unwatched episode instead of a random one.</p>
+                      </div>
+                    </label>
+                  )}
+                  {/* Shuffle */}
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={shuffle}
+                      onChange={(e) => setShuffle(e.target.checked)}
+                      className="mt-0.5 rounded accent-jf-primary"
+                    />
+                    <div>
+                      <p className="text-sm text-jf-text-primary leading-snug">Shuffle</p>
+                      <p className="text-xs text-jf-text-muted">
+                        {selectedItem.Type === 'Series'
+                          ? 'Pick a random episode each time.'
+                          : 'Start playback in shuffle mode.'}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-2 pt-1">
               <Button type="button" variant="secondary" onClick={() => router.back()}>

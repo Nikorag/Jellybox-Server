@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { verifySecret, decrypt } from '@/lib/crypto'
-import { jellyfinGetSessions, jellyfinPlay, jellyfinGetRandomEpisode, JellyfinApiError } from '@/lib/jellyfin'
+import { jellyfinGetSessions, jellyfinPlay, jellyfinGetRandomEpisode, jellyfinGetNextEpisode, JellyfinApiError } from '@/lib/jellyfin'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { isWithinOperatingHours } from '@/lib/utils'
 import { PLAY_ERROR, WEBHOOK_MAX_WAIT_SECONDS } from '@/lib/constants'
@@ -151,6 +151,14 @@ export async function POST(req: Request) {
   // ── 9. Look up RFID tag ───────────────────────────────────────────────────
   const tag = await db.rfidTag.findFirst({
     where: { tagId, userId: matchedDevice.user.id },
+    select: {
+      id: true,
+      jellyfinItemId: true,
+      jellyfinItemType: true,
+      jellyfinItemTitle: true,
+      resumePlayback: true,
+      shuffle: true,
+    },
   })
 
   if (!tag?.jellyfinItemId) {
@@ -202,6 +210,11 @@ export async function POST(req: Request) {
     customHeaders,
   })
 
+  const webhookContext = {
+    deviceName: matchedDevice.name,
+    tagLabel: tag.jellyfinItemTitle ?? tagId,
+  }
+
   if (result.type === 'success') {
     // Record lastPlayedAt for debounce
     await db.device.update({
@@ -209,26 +222,31 @@ export async function POST(req: Request) {
       data: { lastPlayedAt: new Date() },
     })
     await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
+    // Fire TAG_SCANNED webhooks (best-effort, no retry)
+    void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', {
+      ...webhookContext,
+      contentTitle: result.content,
+    })
     return NextResponse.json({ success: true, content: result.content })
   }
 
   // Play failed — check for JELLYFIN_OFFLINE webhooks and retry once
   if (result.code === PLAY_ERROR.OFFLINE) {
-    const webhooks = await db.webhook.findMany({
+    const offlineWebhooks = await db.webhook.findMany({
       where: { userId: matchedDevice.user.id, event: 'JELLYFIN_OFFLINE' },
     })
 
-    if (webhooks.length > 0) {
-      // Fire all webhooks concurrently (best-effort)
+    if (offlineWebhooks.length > 0) {
+      // Fire all JELLYFIN_OFFLINE webhooks concurrently (best-effort, no body for backward compat)
       await Promise.allSettled(
-        webhooks.map((w) =>
+        offlineWebhooks.map((w) =>
           fetch(w.url, { method: 'POST', signal: AbortSignal.timeout(5_000) }).catch(() => null),
         ),
       )
 
       // Wait the shortest configured retry delay (capped to avoid Vercel timeout)
       const waitSeconds = Math.min(
-        Math.min(...webhooks.map((w) => w.retryDelaySeconds)),
+        Math.min(...offlineWebhooks.map((w) => w.retryDelaySeconds)),
         WEBHOOK_MAX_WAIT_SECONDS,
       )
       await new Promise((r) => setTimeout(r, waitSeconds * 1000))
@@ -252,10 +270,18 @@ export async function POST(req: Request) {
           data: { lastPlayedAt: new Date() },
         })
         await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
+        void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', {
+          ...webhookContext,
+          contentTitle: retry.content,
+        })
         return NextResponse.json({ success: true, content: retry.content })
       }
 
       await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, retry.code)
+      void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', {
+        ...webhookContext,
+        errorCode: retry.code,
+      })
       return NextResponse.json(
         { error: retry.message, code: retry.code },
         { status: 503 },
@@ -264,9 +290,13 @@ export async function POST(req: Request) {
   }
 
   await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, result.code)
+  void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', {
+    ...webhookContext,
+    errorCode: result.code,
+  })
   return NextResponse.json(
     { error: result.message, code: result.code },
-    { status: result.code === PLAY_ERROR.OFFLINE ? 503 : 503 },
+    { status: 503 },
   )
 }
 
@@ -286,7 +316,14 @@ async function attemptPlay({
   userId: string
   deviceName: string
   tagId: string
-  tag: { id: string; jellyfinItemId: string | null; jellyfinItemType: string | null; jellyfinItemTitle: string | null }
+  tag: {
+    id: string
+    jellyfinItemId: string | null
+    jellyfinItemType: string | null
+    jellyfinItemTitle: string | null
+    resumePlayback: boolean
+    shuffle: boolean
+  }
   client: { jellyfinDeviceId: string }
   server: { serverUrl: string }
   apiToken: string
@@ -305,17 +342,34 @@ async function attemptPlay({
 
     let playItemId = tag.jellyfinItemId!
     let playItemTitle = tag.jellyfinItemTitle ?? undefined
+    // Default play command; overridden to PlayShuffle for shuffle-enabled non-series items
+    let playCommand: 'PlayNow' | 'PlayShuffle' = 'PlayNow'
 
     if (tag.jellyfinItemType === 'SERIES') {
-      const episode = await jellyfinGetRandomEpisode(server.serverUrl, apiToken, tag.jellyfinItemId!, customHeaders)
-      if (!episode) {
-        return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'No episodes found for this series.' }
+      if (tag.resumePlayback && liveSession.UserId) {
+        const episode = await jellyfinGetNextEpisode(
+          server.serverUrl, apiToken, tag.jellyfinItemId!, liveSession.UserId, customHeaders,
+        )
+        if (!episode) {
+          return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'No episodes found for this series.' }
+        }
+        playItemId = episode.Id
+        playItemTitle = episode.Name
+      } else {
+        // Default: random episode (also used as fallback when no UserId available)
+        const episode = await jellyfinGetRandomEpisode(server.serverUrl, apiToken, tag.jellyfinItemId!, customHeaders)
+        if (!episode) {
+          return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'No episodes found for this series.' }
+        }
+        playItemId = episode.Id
+        playItemTitle = episode.Name
       }
-      playItemId = episode.Id
-      playItemTitle = episode.Name
+    } else if (tag.shuffle) {
+      // Albums and playlists: use Jellyfin's native shuffle command
+      playCommand = 'PlayShuffle'
     }
 
-    await jellyfinPlay(server.serverUrl, apiToken, liveSession.Id, playItemId, customHeaders)
+    await jellyfinPlay(server.serverUrl, apiToken, liveSession.Id, playItemId, customHeaders, playCommand)
     return { type: 'success', content: playItemTitle }
   } catch (err) {
     const code = err instanceof JellyfinApiError && err.isAuthError
@@ -323,6 +377,30 @@ async function attemptPlay({
       : PLAY_ERROR.OFFLINE
     return { type: 'failure', code, message: err instanceof Error ? err.message : 'Jellyfin error.' }
   }
+}
+
+// ── fireWebhooks ──────────────────────────────────────────────────────────────
+
+async function fireWebhooks(
+  userId: string,
+  event: 'TAG_SCANNED' | 'PLAYBACK_FAILED',
+  context: Record<string, string | undefined>,
+): Promise<void> {
+  const webhooks = await db.webhook.findMany({ where: { userId, event } })
+  if (webhooks.length === 0) return
+
+  const body = JSON.stringify({ event, timestamp: new Date().toISOString(), ...context })
+
+  await Promise.allSettled(
+    webhooks.map((w) =>
+      fetch(w.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: AbortSignal.timeout(5_000),
+      }).catch(() => null),
+    ),
+  )
 }
 
 // ── logActivity ───────────────────────────────────────────────────────────────

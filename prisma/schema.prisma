@@ -206,6 +206,11 @@ model RfidTag {
   /// Jellyfin image tag for constructing artwork URL
   jellyfinItemImageTag String?
 
+  /// For SERIES: play next unplayed episode instead of a random one
+  resumePlayback Boolean @default(false)
+  /// For SERIES/ALBUM/PLAYLIST: shuffle playback order
+  shuffle        Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -240,6 +245,8 @@ model AccountPartner {
 
 enum WebhookEvent {
   JELLYFIN_OFFLINE
+  TAG_SCANNED
+  PLAYBACK_FAILED
 }
 
 model Webhook {
