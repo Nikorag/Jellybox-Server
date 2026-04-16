@@ -37,6 +37,19 @@ export function truncate(str: string, maxLength: number): string {
   return str.slice(0, maxLength - 1) + '…'
 }
 
+/**
+ * Returns true if `current` ("HH:MM") falls within [start, end].
+ * Handles overnight ranges e.g. start="22:00" end="06:00".
+ */
+export function isWithinOperatingHours(current: string, start: string, end: string): boolean {
+  if (start === end) return true // same time = always open
+  if (start < end) {
+    return current >= start && current < end
+  }
+  // overnight: e.g. 22:00–06:00
+  return current >= start || current < end
+}
+
 /** Get initials from a display name (up to 2 chars) */
 export function getInitials(name: string | null | undefined): string {
   if (!name) return '?'

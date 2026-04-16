@@ -24,12 +24,21 @@ export const JELLYFIN_REQUEST_TIMEOUT_MS = 8_000
 /** How many items to fetch per page when browsing the library */
 export const JELLYFIN_LIBRARY_PAGE_SIZE = 50
 
+// ─── Scan Debounce ────────────────────────────────────────────────────────────
+/** Default grace period in seconds between successive plays from the same device */
+export const DEFAULT_DEBOUNCE_SECONDS = 5
+
+// ─── Webhook ──────────────────────────────────────────────────────────────────
+/** Maximum total seconds the play endpoint will wait for a webhook retry before giving up */
+export const WEBHOOK_MAX_WAIT_SECONDS = 55
+
 // ─── Playback Error Codes ─────────────────────────────────────────────────────
 export const PLAY_ERROR = {
   UNASSIGNED: 'UNASSIGNED',
   OFFLINE: 'OFFLINE',
   AUTH_ERROR: 'AUTH_ERROR',
   RATE_LIMITED: 'RATE_LIMITED',
+  OUTSIDE_HOURS: 'OUTSIDE_HOURS',
   NO_CLIENT: 'NO_CLIENT',
   UNKNOWN: 'UNKNOWN',
 } as const
