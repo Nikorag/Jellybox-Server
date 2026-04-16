@@ -38,6 +38,17 @@ model User {
   // Partners: accounts this user has been granted access to
   partnerAccess   AccountPartner[] @relation("PartnerAccess")
 
+  // Operating hours (parental controls)
+  operatingHoursEnabled  Boolean @default(false)
+  operatingHoursStart    String? // "HH:MM" 24hr e.g. "07:00"
+  operatingHoursEnd      String? // "HH:MM" 24hr e.g. "21:00"
+  operatingHoursTimezone String? // IANA timezone e.g. "Europe/London"
+
+  /// Grace period in seconds before the same device can trigger playback again
+  scanDebounceSeconds Int @default(5)
+
+  webhooks Webhook[]
+
   @@map("users")
 }
 
@@ -157,6 +168,8 @@ model Device {
   scanModeExpiresAt DateTime?
   /// Tag UID written here when the device scans during scan-capture mode
   pendingScanTagId  String?
+  /// Timestamp of the last successful play — used for debounce
+  lastPlayedAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -223,6 +236,29 @@ model AccountPartner {
   @@map("account_partners")
 }
 
+// ─── Webhooks ────────────────────────────────────────────────────────────────
+
+enum WebhookEvent {
+  JELLYFIN_OFFLINE
+}
+
+model Webhook {
+  id                String       @id @default(cuid())
+  userId            String
+  label             String
+  url               String
+  event             WebhookEvent
+  /// Seconds to wait after firing webhook before retrying the play command
+  retryDelaySeconds Int          @default(30)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
 // ─── Activity Logs ───────────────────────────────────────────────────────────
 
 model ActivityLog {
@@ -237,7 +273,7 @@ model ActivityLog {
   jellyfinItemTitle String?
 
   success   Boolean
-  /// Error code when success = false: UNASSIGNED | OFFLINE | AUTH_ERROR | RATE_LIMITED | UNKNOWN
+  /// Error code when success = false: UNASSIGNED | OFFLINE | AUTH_ERROR | RATE_LIMITED | OUTSIDE_HOURS | NO_CLIENT | UNKNOWN
   errorCode String?
 
   createdAt DateTime @default(now())
