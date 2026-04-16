@@ -32,6 +32,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         selfId={userId}
         selfName={session.user.name ?? null}
         selfEmail={session.user.email ?? ''}
+        selfImage={session.user.image ?? null}
       />
 
       {/* Main content area — pt-14 on mobile clears the fixed top bar */}
