@@ -11,6 +11,13 @@
     @apply bg-jf-bg text-jf-text-primary;
   }
 
+  /* PWA: keep in-flow content clear of landscape notches / rounded corners.
+     Fixed elements must still apply the L/R insets themselves. */
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
   /* Custom scrollbar for dark theme */
   ::-webkit-scrollbar {
     @apply w-1.5;
@@ -38,4 +45,11 @@
   .form-textarea {
     @apply bg-jf-elevated border-jf-border text-jf-text-primary;
   }
+}
+
+@layer utilities {
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
 }

@@ -238,7 +238,7 @@ export default function DashboardNav({
     <>
       {/* Desktop sidebar */}
       <nav
-        className="hidden md:flex flex-col h-full bg-jf-surface border-r border-jf-border w-60 flex-shrink-0"
+        className="hidden md:flex flex-col h-full bg-jf-surface border-r border-jf-border w-60 flex-shrink-0 pt-safe pb-safe pl-safe"
         aria-label="Main navigation"
       >
         {/* Logo */}
@@ -252,8 +252,15 @@ export default function DashboardNav({
         <NavContent {...sharedProps} />
       </nav>
 
-      {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-jf-surface border-b border-jf-border flex items-center px-4 gap-3">
+      {/* Mobile top bar — extends under the OS status bar with matching bg */}
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-40 h-[calc(3.5rem+env(safe-area-inset-top))] bg-jf-surface border-b border-jf-border flex items-center gap-3"
+        style={{
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingLeft: 'calc(1rem + env(safe-area-inset-left))',
+          paddingRight: 'calc(1rem + env(safe-area-inset-right))',
+        }}
+      >
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
@@ -282,7 +289,7 @@ export default function DashboardNav({
 
           {/* Panel */}
           <nav
-            className="relative flex flex-col w-72 max-w-[85vw] h-full bg-jf-surface border-r border-jf-border"
+            className="relative flex flex-col w-72 max-w-[85vw] h-full bg-jf-surface border-r border-jf-border pt-safe pb-safe pl-safe"
             aria-label="Main navigation"
           >
             {/* Header */}

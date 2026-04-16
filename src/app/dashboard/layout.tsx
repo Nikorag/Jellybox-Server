@@ -35,8 +35,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         selfImage={session.user.image ?? null}
       />
 
-      {/* Main content area — pt-14 on mobile clears the fixed top bar */}
-      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
+      {/* Main content area — top padding on mobile clears the fixed top bar (plus iOS status bar) */}
+      <main className="flex-1 overflow-y-auto pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0 pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">{children}</div>
       </main>
     </div>

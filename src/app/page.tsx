@@ -16,7 +16,7 @@ export default async function LandingPage() {
   return (
     <div className="min-h-screen bg-jf-bg flex flex-col">
       {/* Header */}
-      <header className="px-6 py-5 border-b border-jf-border flex items-center justify-between">
+      <header className="px-6 py-5 pt-[calc(1.25rem+env(safe-area-inset-top))] border-b border-jf-border flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
           <Image src="/Icon.png" alt="Jellybox" width={32} height={32} className="flex-shrink-0" />
           <span className="font-semibold text-jf-text-primary text-lg">Jellybox</span>
@@ -191,7 +191,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      <footer className="px-6 py-5 border-t border-jf-border text-center">
+      <footer className="px-6 py-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] border-t border-jf-border text-center">
         <p className="text-xs text-jf-text-muted">
           © {new Date().getFullYear()} Jellybox · Open source · Built for Jellyfin
         </p>

@@ -8,7 +8,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-jf-bg flex flex-col">
       {/* Header */}
-      <header className="px-4 sm:px-6 py-4 border-b border-jf-border flex items-center gap-3 sm:gap-4 bg-jf-surface sticky top-0 z-10">
+      <header className="px-4 sm:px-6 py-4 pt-[calc(1rem+env(safe-area-inset-top))] border-b border-jf-border flex items-center gap-3 sm:gap-4 bg-jf-surface sticky top-0 z-10">
         <Link href="/" className="flex items-center gap-2.5 text-jf-text-secondary hover:text-jf-text-primary transition-colors">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
