@@ -58,5 +58,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         data: { emailVerified: new Date() },
       })
     },
+    // Sync Google profile picture on every sign-in
+    async signIn({ user, account, profile }) {
+      if (account?.provider === 'google' && profile?.picture) {
+        await db.user.update({
+          where: { id: user.id },
+          data: { image: profile.picture as string },
+        })
+      }
+    },
   },
 })
