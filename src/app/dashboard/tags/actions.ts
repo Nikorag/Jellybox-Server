@@ -10,6 +10,12 @@ import type { JellyfinItemType } from '@prisma/client'
 const createTagSchema = z.object({
   tagId: z.string().min(1, 'Tag ID is required').max(64),
   label: z.string().min(1, 'Label is required').max(128),
+  jellyfinItemId: z.string().optional(),
+  jellyfinItemType: z.string().optional(),
+  jellyfinItemTitle: z.string().optional(),
+  jellyfinItemImageTag: z.string().optional(),
+  resumePlayback: z.boolean().optional(),
+  shuffle: z.boolean().optional(),
 })
 
 const updateTagSchema = z.object({
@@ -33,6 +39,12 @@ export async function createTagAction(
   const parsed = createTagSchema.safeParse({
     tagId: formData.get('tagId'),
     label: formData.get('label'),
+    jellyfinItemId: formData.get('jellyfinItemId') ?? undefined,
+    jellyfinItemType: formData.get('jellyfinItemType') ?? undefined,
+    jellyfinItemTitle: formData.get('jellyfinItemTitle') ?? undefined,
+    jellyfinItemImageTag: formData.get('jellyfinItemImageTag') ?? undefined,
+    resumePlayback: formData.get('resumePlayback') === 'true' ? true : formData.get('resumePlayback') === 'false' ? false : undefined,
+    shuffle: formData.get('shuffle') === 'true' ? true : formData.get('shuffle') === 'false' ? false : undefined,
   })
   if (!parsed.success) {
     return { error: parsed.error.errors[0]?.message ?? 'Invalid input.' }
@@ -50,6 +62,14 @@ export async function createTagAction(
       userId: accountId,
       tagId: parsed.data.tagId,
       label: parsed.data.label,
+      ...(parsed.data.jellyfinItemId && {
+        jellyfinItemId: parsed.data.jellyfinItemId,
+        jellyfinItemType: (parsed.data.jellyfinItemType as JellyfinItemType | null) ?? null,
+        jellyfinItemTitle: parsed.data.jellyfinItemTitle ?? null,
+        jellyfinItemImageTag: parsed.data.jellyfinItemImageTag ?? null,
+      }),
+      ...(parsed.data.resumePlayback !== undefined && { resumePlayback: parsed.data.resumePlayback }),
+      ...(parsed.data.shuffle !== undefined && { shuffle: parsed.data.shuffle }),
     },
   })
 
