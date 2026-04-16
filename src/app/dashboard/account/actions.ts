@@ -88,3 +88,50 @@ export async function clearActivityLogAction(): Promise<{ error?: string }> {
   revalidatePath('/dashboard')
   return {}
 }
+
+const operatingHoursSchema = z.object({
+  enabled: z.boolean(),
+  start: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  end: z.string().regex(/^\d{2}:\d{2}$/).optional().nullable(),
+  timezone: z.string().max(64).optional().nullable(),
+})
+
+export async function saveOperatingHoursAction(
+  data: z.infer<typeof operatingHoursSchema>,
+): Promise<{ error?: string; success?: boolean }> {
+  const session = await auth()
+  if (!session?.user?.id) return { error: 'Unauthorised' }
+
+  const parsed = operatingHoursSchema.safeParse(data)
+  if (!parsed.success) return { error: parsed.error.errors[0]?.message ?? 'Invalid input.' }
+
+  await db.user.update({
+    where: { id: session.user.id },
+    data: {
+      operatingHoursEnabled: parsed.data.enabled,
+      operatingHoursStart: parsed.data.start ?? null,
+      operatingHoursEnd: parsed.data.end ?? null,
+      operatingHoursTimezone: parsed.data.timezone ?? null,
+    },
+  })
+
+  revalidatePath('/dashboard/account')
+  return { success: true }
+}
+
+export async function saveDebounceAction(
+  seconds: number,
+): Promise<{ error?: string; success?: boolean }> {
+  const session = await auth()
+  if (!session?.user?.id) return { error: 'Unauthorised' }
+
+  const clamped = Math.min(Math.max(Math.round(seconds), 0), 30)
+
+  await db.user.update({
+    where: { id: session.user.id },
+    data: { scanDebounceSeconds: clamped },
+  })
+
+  revalidatePath('/dashboard/account')
+  return { success: true }
+}
