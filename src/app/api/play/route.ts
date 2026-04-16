@@ -4,7 +4,8 @@ import { db } from '@/lib/db'
 import { verifySecret, decrypt } from '@/lib/crypto'
 import { jellyfinGetSessions, jellyfinPlay, jellyfinGetRandomEpisode, JellyfinApiError } from '@/lib/jellyfin'
 import { checkRateLimit } from '@/lib/rate-limit'
-import { PLAY_ERROR } from '@/lib/constants'
+import { isWithinOperatingHours } from '@/lib/utils'
+import { PLAY_ERROR, WEBHOOK_MAX_WAIT_SECONDS } from '@/lib/constants'
 
 const playSchema = z.object({
   tagId: z.string().min(1, 'tagId is required'),
@@ -41,13 +42,21 @@ export async function POST(req: Request) {
   const { tagId } = parsed.data
 
   // ── 3. Find matching device by comparing key hash ─────────────────────────
-  // Fetch a limited set of devices that share the key prefix for efficiency
   const keyPrefix = rawKey.slice(0, 11) // "jb_" + 8 chars
 
   const candidates = await db.device.findMany({
     where: { apiKeyPrefix: keyPrefix },
     include: {
-      user: { select: { id: true } },
+      user: {
+        select: {
+          id: true,
+          operatingHoursEnabled: true,
+          operatingHoursStart: true,
+          operatingHoursEnd: true,
+          operatingHoursTimezone: true,
+          scanDebounceSeconds: true,
+        },
+      },
       defaultClient: true,
     },
   })
@@ -93,7 +102,43 @@ export async function POST(req: Request) {
     )
   }
 
-  // ── 6. Update device last seen + firmware if provided ─────────────────────
+  // ── 6. Debounce check ─────────────────────────────────────────────────────
+  const debounceSeconds = matchedDevice.user.scanDebounceSeconds
+  if (debounceSeconds > 0 && matchedDevice.lastPlayedAt) {
+    const elapsed = (Date.now() - matchedDevice.lastPlayedAt.getTime()) / 1000
+    if (elapsed < debounceSeconds) {
+      return NextResponse.json(
+        {
+          error: 'Too soon after last scan.',
+          code: PLAY_ERROR.RATE_LIMITED,
+          retryAfterSeconds: Math.ceil(debounceSeconds - elapsed),
+        },
+        { status: 429, headers: { 'Retry-After': String(Math.ceil(debounceSeconds - elapsed)) } },
+      )
+    }
+  }
+
+  // ── 7. Operating hours check ──────────────────────────────────────────────
+  const { operatingHoursEnabled, operatingHoursStart, operatingHoursEnd, operatingHoursTimezone } = matchedDevice.user
+  if (operatingHoursEnabled && operatingHoursStart && operatingHoursEnd) {
+    const tz = operatingHoursTimezone ?? 'UTC'
+    const localTime = new Intl.DateTimeFormat('en-GB', {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date())
+
+    if (!isWithinOperatingHours(localTime, operatingHoursStart, operatingHoursEnd)) {
+      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, null, false, PLAY_ERROR.OUTSIDE_HOURS)
+      return NextResponse.json(
+        { error: 'Outside operating hours.', code: PLAY_ERROR.OUTSIDE_HOURS },
+        { status: 403 },
+      )
+    }
+  }
+
+  // ── 8. Update device last seen + firmware if provided ─────────────────────
   const firmwareVersion = req.headers.get('X-Firmware-Version') ?? undefined
   await db.device.update({
     where: { id: matchedDevice.id },
@@ -103,7 +148,7 @@ export async function POST(req: Request) {
     },
   })
 
-  // ── 6. Look up RFID tag ───────────────────────────────────────────────────
+  // ── 9. Look up RFID tag ───────────────────────────────────────────────────
   const tag = await db.rfidTag.findFirst({
     where: { tagId, userId: matchedDevice.user.id },
   })
@@ -116,7 +161,7 @@ export async function POST(req: Request) {
     )
   }
 
-  // ── 7. Determine playback client ──────────────────────────────────────────
+  // ── 10. Determine playback client ──────────────────────────────────────────
   const client = matchedDevice.defaultClient
   if (!client) {
     await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, PLAY_ERROR.NO_CLIENT)
@@ -126,7 +171,7 @@ export async function POST(req: Request) {
     )
   }
 
-  // ── 8. Get Jellyfin server + find live session ────────────────────────────
+  // ── 11. Get Jellyfin server + find live session ────────────────────────────
   const server = await db.jellyfinServer.findUnique({
     where: { userId: matchedDevice.user.id },
   })
@@ -139,78 +184,148 @@ export async function POST(req: Request) {
     )
   }
 
+  const apiToken = decrypt(server.apiToken)
+  const customHeaders = server.customHeaders
+    ? (() => { try { return JSON.parse(decrypt(server.customHeaders!)) as Record<string, string> } catch { return {} } })()
+    : {}
+
+  // ── 12. Attempt playback (with optional webhook retry) ────────────────────
+  const result = await attemptPlay({
+    deviceId: matchedDevice.id,
+    userId: matchedDevice.user.id,
+    deviceName: matchedDevice.name,
+    tagId,
+    tag,
+    client,
+    server,
+    apiToken,
+    customHeaders,
+  })
+
+  if (result.type === 'success') {
+    // Record lastPlayedAt for debounce
+    await db.device.update({
+      where: { id: matchedDevice.id },
+      data: { lastPlayedAt: new Date() },
+    })
+    await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
+    return NextResponse.json({ success: true, content: result.content })
+  }
+
+  // Play failed — check for JELLYFIN_OFFLINE webhooks and retry once
+  if (result.code === PLAY_ERROR.OFFLINE) {
+    const webhooks = await db.webhook.findMany({
+      where: { userId: matchedDevice.user.id, event: 'JELLYFIN_OFFLINE' },
+    })
+
+    if (webhooks.length > 0) {
+      // Fire all webhooks concurrently (best-effort)
+      await Promise.allSettled(
+        webhooks.map((w) =>
+          fetch(w.url, { method: 'POST', signal: AbortSignal.timeout(5_000) }).catch(() => null),
+        ),
+      )
+
+      // Wait the shortest configured retry delay (capped to avoid Vercel timeout)
+      const waitSeconds = Math.min(
+        Math.min(...webhooks.map((w) => w.retryDelaySeconds)),
+        WEBHOOK_MAX_WAIT_SECONDS,
+      )
+      await new Promise((r) => setTimeout(r, waitSeconds * 1000))
+
+      // Retry play once
+      const retry = await attemptPlay({
+        deviceId: matchedDevice.id,
+        userId: matchedDevice.user.id,
+        deviceName: matchedDevice.name,
+        tagId,
+        tag,
+        client,
+        server,
+        apiToken,
+        customHeaders,
+      })
+
+      if (retry.type === 'success') {
+        await db.device.update({
+          where: { id: matchedDevice.id },
+          data: { lastPlayedAt: new Date() },
+        })
+        await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
+        return NextResponse.json({ success: true, content: retry.content })
+      }
+
+      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, retry.code)
+      return NextResponse.json(
+        { error: retry.message, code: retry.code },
+        { status: 503 },
+      )
+    }
+  }
+
+  await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, result.code)
+  return NextResponse.json(
+    { error: result.message, code: result.code },
+    { status: result.code === PLAY_ERROR.OFFLINE ? 503 : 503 },
+  )
+}
+
+// ── attemptPlay ───────────────────────────────────────────────────────────────
+
+type PlaySuccess = { type: 'success'; content: string | undefined }
+type PlayFailure = { type: 'failure'; code: string; message: string }
+
+async function attemptPlay({
+  client,
+  server,
+  apiToken,
+  customHeaders,
+  tag,
+}: {
+  deviceId: string
+  userId: string
+  deviceName: string
+  tagId: string
+  tag: { id: string; jellyfinItemId: string | null; jellyfinItemType: string | null; jellyfinItemTitle: string | null }
+  client: { jellyfinDeviceId: string }
+  server: { serverUrl: string }
+  apiToken: string
+  customHeaders: Record<string, string>
+}): Promise<PlaySuccess | PlayFailure> {
   try {
-    const apiToken = decrypt(server.apiToken)
-    const customHeaders = server.customHeaders
-      ? (() => { try { return JSON.parse(decrypt(server.customHeaders!)) as Record<string, string> } catch { return {} } })()
-      : {}
     const sessions = await jellyfinGetSessions(server.serverUrl, apiToken, customHeaders)
 
-    // Resolve live session by matching DeviceId
-    // SupportsRemoteControl may be absent for some clients — don't exclude on undefined
-    console.log('[play] looking for DeviceId:', client.jellyfinDeviceId)
-    console.log('[play] sessions from Jellyfin:', sessions.map((s) => ({
-      DeviceId: s.DeviceId,
-      DeviceName: s.DeviceName,
-      Client: s.Client,
-      SupportsRemoteControl: s.SupportsRemoteControl,
-    })))
     const liveSession = sessions.find(
       (s) => s.DeviceId === client.jellyfinDeviceId && s.SupportsRemoteControl !== false,
     )
 
     if (!liveSession) {
-      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, PLAY_ERROR.OFFLINE)
-      return NextResponse.json(
-        { error: 'Playback client is not active.', code: PLAY_ERROR.OFFLINE },
-        { status: 503 },
-      )
+      return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'Playback client is not active.' }
     }
 
-    // ── 9. Resolve playable item (series → random episode) ───────────────
-    let playItemId = tag.jellyfinItemId
+    let playItemId = tag.jellyfinItemId!
     let playItemTitle = tag.jellyfinItemTitle ?? undefined
 
     if (tag.jellyfinItemType === 'SERIES') {
-      const episode = await jellyfinGetRandomEpisode(server.serverUrl, apiToken, tag.jellyfinItemId, customHeaders)
+      const episode = await jellyfinGetRandomEpisode(server.serverUrl, apiToken, tag.jellyfinItemId!, customHeaders)
       if (!episode) {
-        await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, PLAY_ERROR.OFFLINE)
-        return NextResponse.json(
-          { error: 'No episodes found for this series.', code: PLAY_ERROR.OFFLINE },
-          { status: 503 },
-        )
+        return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'No episodes found for this series.' }
       }
       playItemId = episode.Id
       playItemTitle = episode.Name
     }
 
-    // ── 10. Trigger playback ──────────────────────────────────────────────
-    console.log('[play] triggering playback', {
-      sessionId: liveSession.Id,
-      itemId: playItemId,
-      itemTitle: playItemTitle,
-      seriesId: tag.jellyfinItemType === 'SERIES' ? tag.jellyfinItemId : undefined,
-    })
     await jellyfinPlay(server.serverUrl, apiToken, liveSession.Id, playItemId, customHeaders)
-
-    await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
-
-    return NextResponse.json({ success: true, content: playItemTitle ?? tag.jellyfinItemTitle })
+    return { type: 'success', content: playItemTitle }
   } catch (err) {
     const code = err instanceof JellyfinApiError && err.isAuthError
       ? PLAY_ERROR.AUTH_ERROR
       : PLAY_ERROR.OFFLINE
-
-    await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, code)
-
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Jellyfin error.', code },
-      { status: 503 },
-    )
+    return { type: 'failure', code, message: err instanceof Error ? err.message : 'Jellyfin error.' }
   }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── logActivity ───────────────────────────────────────────────────────────────
 
 async function logActivity(
   deviceId: string,
