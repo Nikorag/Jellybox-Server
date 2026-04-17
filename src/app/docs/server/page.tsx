@@ -194,10 +194,6 @@ export default function ServerPage() {
             forked repository. Vercel will detect it as a Next.js project automatically.
           </p>
           <p>
-            Under <strong className="text-jf-text-primary">Root Directory</strong>, set it to{' '}
-            <Code>apps/server</Code> — the monorepo puts the Next.js app there.
-          </p>
-          <p>
             Before clicking <strong className="text-jf-text-primary">Deploy</strong>, add all your
             environment variables (see step 7). Vercel will inject them at build time.
           </p>
