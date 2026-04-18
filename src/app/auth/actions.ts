@@ -11,6 +11,7 @@ import {
   VERIFICATION_TOKEN_EXPIRY_HOURS,
   PASSWORD_RESET_TOKEN_EXPIRY_HOURS,
 } from '@/lib/constants'
+import { getAuthProviderFlags } from '@/lib/auth-flags'
 import { AuthError } from 'next-auth'
 
 // ─── Sign Up ─────────────────────────────────────────────────────────────────
@@ -32,6 +33,10 @@ export async function signUpAction(
   _prev: SignUpFormState,
   formData: FormData,
 ): Promise<SignUpFormState> {
+  if (!getAuthProviderFlags().signupEnabled) {
+    return { error: 'Sign-up is disabled.' }
+  }
+
   const parsed = signUpSchema.safeParse({
     name: formData.get('name'),
     email: formData.get('email'),

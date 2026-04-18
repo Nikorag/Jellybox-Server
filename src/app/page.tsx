@@ -3,6 +3,8 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { auth } from '@/auth'
 import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants'
+import { getAuthProviderFlags, publicPagesDisabled } from '@/lib/auth-flags'
+import { redirect } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: APP_NAME,
@@ -12,6 +14,12 @@ export const metadata: Metadata = {
 export default async function LandingPage() {
   const session = await auth()
   const user = session?.user
+
+  if (publicPagesDisabled()) {
+    redirect(user ? '/dashboard' : '/auth/signin')
+  }
+
+  const { signupEnabled } = getAuthProviderFlags()
 
   return (
     <div className="min-h-screen bg-jf-bg flex flex-col">
@@ -43,12 +51,14 @@ export default async function LandingPage() {
               >
                 Sign in
               </Link>
-              <Link
-                href="/auth/signup"
-                className="px-4 py-2 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white text-sm font-semibold transition-colors"
-              >
-                Get started
-              </Link>
+              {signupEnabled && (
+                <Link
+                  href="/auth/signup"
+                  className="px-4 py-2 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white text-sm font-semibold transition-colors"
+                >
+                  Get started
+                </Link>
+              )}
             </>
           )}
         </div>
@@ -91,12 +101,14 @@ export default async function LandingPage() {
           </div>
         ) : (
           <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/auth/signup"
-              className="px-6 py-3 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white font-semibold text-sm transition-colors"
-            >
-              Create free account
-            </Link>
+            {signupEnabled && (
+              <Link
+                href="/auth/signup"
+                className="px-6 py-3 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white font-semibold text-sm transition-colors"
+              >
+                Create free account
+              </Link>
+            )}
             <Link
               href="/auth/signin"
               className="px-6 py-3 rounded-lg border border-jf-border bg-jf-surface hover:bg-jf-elevated text-jf-text-primary font-semibold text-sm transition-colors"

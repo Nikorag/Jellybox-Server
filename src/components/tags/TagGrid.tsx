@@ -6,13 +6,7 @@ import type { RfidTag } from '@prisma/client'
 import { Button, EmptyState } from '@/components/ui'
 import TagCard from './TagCard'
 
-export default function TagGrid({
-  tags,
-  jellyfinServerUrl,
-}: {
-  tags: RfidTag[]
-  jellyfinServerUrl: string | null
-}) {
+export default function TagGrid({ tags }: { tags: RfidTag[] }) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('all')
 
@@ -72,7 +66,7 @@ export default function TagGrid({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {filtered.map((tag) => (
-            <TagCard key={tag.id} tag={tag} jellyfinServerUrl={jellyfinServerUrl} />
+            <TagCard key={tag.id} tag={tag} />
           ))}
         </div>
       )}

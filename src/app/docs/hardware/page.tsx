@@ -81,13 +81,18 @@ const bom = [
     qty: 1,
   },
   {
-    component: 'NeoPixel 12-LED ring (WS2812B)',
-    notes: 'Any WS2812B 12-LED ring. Adafruit part #1643 is the reference, but unbranded ones work fine.',
+    component: 'NeoPixel 16-LED ring (WS2812B)',
+    notes: 'Any WS2812B 16-LED ring. Unbranded ones from Amazon/AliExpress work fine.',
     qty: 1,
   },
   {
-    component: 'Micro-USB or USB-C cable & 5V power supply',
-    notes: 'Depending on your ESP32 board. A phone charger works well.',
+    component: 'LiPo battery + TP4056 charger board',
+    notes: 'Jellybox is designed to run on a battery. A 1000–2000 mAh single-cell LiPo with a TP4056 (micro-USB or USB-C) charging board works well.',
+    qty: 1,
+  },
+  {
+    component: 'SPDT power switch',
+    notes: 'Any small slide or toggle switch rated for the battery current. Fitted in line between the TP4056 output and the ESP32 so the device can be turned off completely.',
     qty: 1,
   },
   {
@@ -159,13 +164,12 @@ export default function HardwarePage() {
 
         <PinTable
           title="PN532 NFC reader (I²C)"
+          note="IRQ and RST are not used by the firmware yet — leave those pins on the PN532 disconnected."
           rows={[
             { from: 'VCC', to: '3.3V', desc: '3.3 V only — do not use 5 V' },
             { from: 'GND', to: 'GND', desc: '' },
             { from: 'SDA', to: 'GPIO 21', desc: 'I²C data — add 4.7 kΩ pull-up to 3.3 V if signal is unstable' },
             { from: 'SCL', to: 'GPIO 22', desc: 'I²C clock' },
-            { from: 'IRQ', to: 'GPIO 25', desc: 'Interrupt — lets the ESP32 sleep until a card is present' },
-            { from: 'RST', to: 'GPIO 26', desc: 'Reset' },
           ]}
         />
 
@@ -185,7 +189,7 @@ export default function HardwarePage() {
         />
 
         <PinTable
-          title="NeoPixel 12-LED ring (WS2812B)"
+          title="NeoPixel 16-LED ring (WS2812B)"
           rows={[
             { from: 'VCC / +5V', to: '5V (VIN)', desc: 'Use 5 V from the ESP32 VIN pin for full brightness. 3.3 V also works at lower brightness.' },
             { from: 'GND', to: 'GND', desc: '' },
@@ -202,16 +206,37 @@ export default function HardwarePage() {
 
       {/* Power */}
       <section className="mb-10">
-        <SectionHeader title="Power" />
+        <SectionHeader
+          title="Power"
+          description="Jellybox is designed as a portable, battery-powered device — not a tethered USB gadget."
+        />
         <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
-          The entire assembly draws around 200–300 mA at 5 V when active (mostly the NeoPixel ring). A
-          standard 1 A USB power supply is more than adequate. Plug into the ESP32&apos;s USB port and
-          it will regulate everything down to 3.3 V internally.
+          The assembly draws around 200–300 mA at 5 V when active (mostly the NeoPixel ring). A
+          single-cell LiPo (1000–2000 mAh) wired through a <strong className="text-jf-text-primary">TP4056</strong>{' '}
+          charger board gives a good balance of runtime and size, and lets you recharge over USB without
+          removing the cell.
         </p>
+
+        <PinTable
+          title="Battery wiring (TP4056 → ESP32)"
+          note="Fit a power switch in line between the TP4056 output and the ESP32 so the device can be fully turned off when not in use."
+          rows={[
+            { from: 'LiPo +', to: 'TP4056 B+', desc: 'Battery positive into the charger board' },
+            { from: 'LiPo −', to: 'TP4056 B−', desc: 'Battery negative into the charger board' },
+            { from: 'TP4056 OUT+', to: 'Switch → ESP32 5V / VIN', desc: 'Run the positive output through an SPDT switch, then into the ESP32 5 V rail' },
+            { from: 'TP4056 OUT−', to: 'ESP32 GND', desc: 'Common ground' },
+          ]}
+        />
+
+        <Callout variant="warn">
+          Always wire the switch on the <strong>TP4056 output</strong> (not between the battery and
+          the charger). This way the cell can still charge over USB while the device is switched off.
+        </Callout>
+
         <p className="text-sm text-jf-text-secondary leading-relaxed">
-          If you want to run from a battery, the ESP32&apos;s deep-sleep mode isn&apos;t currently used —
-          the device stays active waiting for NFC scans — so expect a rechargeable battery to last a
-          few hours at most. Mains power via USB is the intended use case.
+          The firmware does not use the ESP32&apos;s deep-sleep mode yet, so the device stays active
+          while switched on. Expect a few hours of runtime from a 2000 mAh cell — flip the switch off
+          between uses to extend battery life.
         </p>
       </section>
 

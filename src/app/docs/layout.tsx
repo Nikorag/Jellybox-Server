@@ -1,10 +1,18 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { auth } from '@/auth'
+import { publicPagesDisabled } from '@/lib/auth-flags'
 import DocsSidebar from './DocsSidebar'
 import DocsMobileNav from './DocsMobileNav'
 
-export default function DocsLayout({ children }: { children: ReactNode }) {
+export default async function DocsLayout({ children }: { children: ReactNode }) {
+  if (publicPagesDisabled()) {
+    const session = await auth()
+    if (!session?.user?.id) redirect('/auth/signin')
+  }
+
   return (
     <div className="min-h-screen bg-jf-bg flex flex-col">
       {/* Header */}

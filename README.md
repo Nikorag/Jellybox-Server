@@ -77,6 +77,13 @@ cp .env.example .env.local
 | `RESEND_API_KEY`          | Resend API key                                               | `re_...`                             |
 | `EMAIL_FROM`              | Verified sender address                                      | `Jellybox <noreply@yourdomain.com>`  |
 | `NEXT_PUBLIC_APP_URL`     | Public base URL (used in emails)                             | `http://localhost:3000`              |
+| `AUTH_OIDC_ISSUER`        | (Optional) OIDC issuer URL — enables generic SSO when set with `_ID` and `_SECRET` | `https://auth.example.com`           |
+| `AUTH_OIDC_ID`            | (Optional) OIDC client ID                                    | `jellybox`                           |
+| `AUTH_OIDC_SECRET`        | (Optional) OIDC client secret                                | `...`                                |
+| `AUTH_OIDC_NAME`          | (Optional) Button label for the OIDC provider                | `Authelia`                           |
+| `AUTH_DISABLE_GOOGLE`     | (Optional) Set `true` to disable Google sign-in entirely     | `false`                              |
+| `AUTH_DISABLE_SIGNUP`     | (Optional) Set `true` to disable account creation            | `false`                              |
+| `DISABLE_PUBLIC_PAGES`    | (Optional) Set `true` to hide the landing and docs pages from anonymous users | `false`                              |
 
 ### 3. Database Setup
 
@@ -222,15 +229,3 @@ All variables listed in `.env.example` are required. For production:
 3. Run `npm test` and `npm run lint` before opening a PR.
 4. Open a PR against `main`. CI will run tests automatically.
 
-# TODO
-- Custom OIDC Support for login
-- ENV flag to disable google oauth
-- ENV flag to Disable SignUp
-- ENV flag to Disable Splash and info pages.
-- Ensure Jellyfin custom headers are sent in image requests too
-- Docs Edits:
-- - neon is an option. any PgDB will do.
-- - its a 6 led ring
-- - its meant to run on a battery, not a power supply
-- - you should add a power switch in line from the TP to the ESP32
-- - remove wiring guide for IRQ and RST from the pn532. its not used (yet)

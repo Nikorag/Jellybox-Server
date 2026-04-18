@@ -80,7 +80,9 @@ export default function ServerPage() {
           The Jellybox server is a Next.js application. This guide deploys it to{' '}
           <strong className="text-jf-text-primary">Vercel</strong> with a{' '}
           <strong className="text-jf-text-primary">Neon</strong> PostgreSQL database — both have
-          generous free tiers that are more than enough for a home setup.
+          generous free tiers that are more than enough for a home setup. Neon is just one option;
+          any PostgreSQL database (self-hosted, Supabase, Railway, RDS, etc.) will work — anywhere
+          you can point <Code>DATABASE_URL</Code> at a Postgres instance.
         </p>
       </div>
 

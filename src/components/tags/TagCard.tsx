@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import type { RfidTag } from '@prisma/client'
 import { Badge, ConfirmDialog } from '@/components/ui'
-import { getJellyfinImageUrl } from '@/lib/jellyfin'
 import { deleteTagAction } from '@/app/dashboard/tags/actions'
 import { truncate } from '@/lib/utils'
 
@@ -17,19 +16,16 @@ const typeBadgeVariant: Record<string, 'primary' | 'info' | 'neutral'> = {
   PLAYLIST: 'neutral',
 }
 
-export default function TagCard({
-  tag,
-  jellyfinServerUrl,
-}: {
-  tag: RfidTag
-  jellyfinServerUrl: string | null
-}) {
+export default function TagCard({ tag }: { tag: RfidTag }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Images are proxied through /api/jellyfin/image so the request is
+  // authenticated and any custom Jellyfin headers (e.g. Cloudflare Access)
+  // are forwarded to the origin.
   const imageUrl =
-    jellyfinServerUrl && tag.jellyfinItemId && tag.jellyfinItemImageTag
-      ? getJellyfinImageUrl(jellyfinServerUrl, tag.jellyfinItemId, tag.jellyfinItemImageTag, 600)
+    tag.jellyfinItemId && tag.jellyfinItemImageTag
+      ? `/api/jellyfin/image?itemId=${tag.jellyfinItemId}&tag=${tag.jellyfinItemImageTag}&width=600`
       : null
 
   async function handleDelete() {

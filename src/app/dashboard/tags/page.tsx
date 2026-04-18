@@ -20,11 +20,6 @@ export default async function TagsPage() {
     orderBy: { createdAt: 'desc' },
   })
 
-  const server = await db.jellyfinServer.findUnique({
-    where: { userId: accountId },
-    select: { serverUrl: true },
-  })
-
   return (
     <div>
       <PageHeader
@@ -36,7 +31,7 @@ export default async function TagsPage() {
           </Link>
         }
       />
-      <TagGrid tags={tags} jellyfinServerUrl={server?.serverUrl ?? null} />
+      <TagGrid tags={tags} />
     </div>
   )
 }

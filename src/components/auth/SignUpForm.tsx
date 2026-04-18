@@ -4,14 +4,19 @@ import { useActionState } from 'react'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
 import { signUpAction, type SignUpFormState } from '@/app/auth/actions'
+import type { AuthProviderFlags } from '@/lib/auth-flags'
 
 const initialState: SignUpFormState = {}
 
-export default function SignUpForm() {
+export default function SignUpForm({ flags }: { flags: AuthProviderFlags }) {
   const [state, formAction, isPending] = useActionState(signUpAction, initialState)
 
   async function handleGoogleSignIn() {
     await signIn('google', { callbackUrl: '/dashboard' })
+  }
+
+  async function handleOidcSignIn() {
+    await signIn('oidc', { callbackUrl: '/dashboard' })
   }
 
   if (state.success) {
@@ -35,6 +40,8 @@ export default function SignUpForm() {
       </div>
     )
   }
+
+  const showDivider = flags.google || flags.oidc.enabled
 
   return (
     <div className="bg-jf-surface border border-jf-border rounded-xl p-8 shadow-card">
@@ -103,23 +110,38 @@ export default function SignUpForm() {
         </button>
       </form>
 
-      <div className="relative my-5">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-jf-border" />
+      {showDivider && (
+        <div className="relative my-5">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-jf-border" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-jf-surface px-2 text-jf-text-muted">or</span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-jf-surface px-2 text-jf-text-muted">or</span>
-        </div>
-      </div>
+      )}
 
-      <button
-        type="button"
-        onClick={handleGoogleSignIn}
-        className="w-full py-2.5 px-4 rounded-lg border border-jf-border bg-jf-elevated hover:bg-jf-overlay text-jf-text-primary font-medium text-sm transition-colors flex items-center justify-center gap-2"
-      >
-        <GoogleIcon />
-        Continue with Google
-      </button>
+      {flags.google && (
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          className="w-full py-2.5 px-4 rounded-lg border border-jf-border bg-jf-elevated hover:bg-jf-overlay text-jf-text-primary font-medium text-sm transition-colors flex items-center justify-center gap-2"
+        >
+          <GoogleIcon />
+          Continue with Google
+        </button>
+      )}
+
+      {flags.oidc.enabled && (
+        <button
+          type="button"
+          onClick={handleOidcSignIn}
+          className={`w-full py-2.5 px-4 rounded-lg border border-jf-border bg-jf-elevated hover:bg-jf-overlay text-jf-text-primary font-medium text-sm transition-colors flex items-center justify-center gap-2 ${flags.google ? 'mt-2' : ''}`}
+        >
+          <SsoIcon />
+          Continue with {flags.oidc.name}
+        </button>
+      )}
 
       <p className="mt-6 text-center text-sm text-jf-text-muted">
         Already have an account?{' '}
@@ -150,6 +172,15 @@ function GoogleIcon() {
         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
         fill="#EA4335"
       />
+    </svg>
+  )
+}
+
+function SsoIcon() {
+  return (
+    <svg className="w-4 h-4 text-jf-text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        d="M12 15v2m0-10a3 3 0 013 3v2H9V10a3 3 0 013-3zM5 21h14a2 2 0 002-2v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2z" />
     </svg>
   )
 }
