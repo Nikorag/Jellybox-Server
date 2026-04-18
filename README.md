@@ -221,3 +221,8 @@ All variables listed in `.env.example` are required. For production:
 2. Make your changes with tests.
 3. Run `npm test` and `npm run lint` before opening a PR.
 4. Open a PR against `main`. CI will run tests automatically.
+
+# TODO
+- OIDC Support for login
+- Disable SignUp
+- Disable Splash and info pages.
