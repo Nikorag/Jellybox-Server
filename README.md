@@ -223,6 +223,14 @@ All variables listed in `.env.example` are required. For production:
 4. Open a PR against `main`. CI will run tests automatically.
 
 # TODO
-- OIDC Support for login
-- Disable SignUp
-- Disable Splash and info pages.
+- Custom OIDC Support for login
+- ENV flag to disable google oauth
+- ENV flag to Disable SignUp
+- ENV flag to Disable Splash and info pages.
+- Ensure Jellyfin custom headers are sent in image requests too
+- Docs Edits:
+- - neon is an option. any PgDB will do.
+- - its a 6 led ring
+- - its meant to run on a battery, not a power supply
+- - you should add a power switch in line from the TP to the ESP32
+- - remove wiring guide for IRQ and RST from the pn532. its not used (yet)
