@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 
 export const metadata: Metadata = { title: 'Components & Wiring — Jellybox Docs' }
@@ -119,6 +120,21 @@ export default function HardwarePage() {
           Everything you need to build a Jellybox device from scratch. The hardware is intentionally
           simple: an ESP32, an NFC reader, an eInk screen, and some LEDs.
         </p>
+
+        <figure className="mt-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
+          <div className="relative aspect-[4/5] sm:aspect-[3/2]">
+            <Image
+              src="/product.png"
+              alt="Assembled Jellybox device with its eInk screen, glowing NeoPixel ring, and a row of figurine tags in front of it."
+              fill
+              sizes="(max-width: 768px) 100vw, 720px"
+              className="object-cover"
+            />
+          </div>
+          <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
+            A finished Jellybox — slate enclosure, eInk screen, NeoPixel status ring, and figurine tags.
+          </figcaption>
+        </figure>
       </div>
 
       {/* BOM */}

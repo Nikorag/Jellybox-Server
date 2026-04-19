@@ -65,61 +65,89 @@ export default async function LandingPage() {
       </header>
 
       {/* Hero */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-24 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-jf-primary-muted border border-jf-primary/30 text-jf-primary text-xs font-medium mb-6">
-          <span className="w-1.5 h-1.5 rounded-full bg-jf-primary" />
-          Companion app for Jellybox hardware
-        </div>
+      <main className="flex-1 flex flex-col px-4 py-16 sm:py-20">
+        <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+          {/* Copy */}
+          <div className="text-center lg:text-left order-2 lg:order-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-jf-primary-muted border border-jf-primary/30 text-jf-primary text-xs font-medium mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-jf-primary" />
+              Companion app for Jellybox hardware
+            </div>
 
-        <h1 className="text-5xl font-extrabold text-jf-text-primary max-w-2xl leading-tight mb-6">
-          Give kids{' '}
-          <span className="text-jf-primary">physical control</span>{' '}
-          of their media
-        </h1>
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-jf-text-primary leading-tight mb-6">
+              Give kids{' '}
+              <span className="text-jf-primary">physical control</span>{' '}
+              of their media
+            </h1>
 
-        <p className="text-lg text-jf-text-secondary max-w-xl mb-10 leading-relaxed">
-          Jellybox lets children scan RFID tags to play movies, music, and shows from your Jellyfin
-          server — no apps, no passwords, no rabbit holes.
-        </p>
-
-        {user ? (
-          <div className="flex flex-col items-center gap-4 p-6 rounded-2xl border border-jf-primary/30 bg-jf-primary-muted max-w-sm w-full">
-            <p className="text-sm text-jf-text-secondary">
-              Welcome back, <span className="font-semibold text-jf-text-primary">{user.name ?? user.email}</span>
+            <p className="text-lg text-jf-text-secondary max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed">
+              Jellybox lets children scan RFID tags to play movies, music, and shows from your Jellyfin
+              server — no apps, no passwords, no rabbit holes.
             </p>
-            <Link
-              href="/dashboard"
-              className="w-full py-2.5 px-4 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white font-semibold text-sm transition-colors text-center"
-            >
-              Go to My Jellybox
-            </Link>
-            <div className="flex gap-4 text-xs text-jf-text-muted">
-              <Link href="/dashboard/tags" className="hover:text-jf-primary transition-colors">Tags</Link>
-              <Link href="/dashboard/devices" className="hover:text-jf-primary transition-colors">Devices</Link>
-              <Link href="/dashboard/jellyfin" className="hover:text-jf-primary transition-colors">Jellyfin</Link>
+
+            {user ? (
+              <div className="flex flex-col items-center lg:items-start gap-4 p-6 rounded-2xl border border-jf-primary/30 bg-jf-primary-muted max-w-sm w-full mx-auto lg:mx-0">
+                <p className="text-sm text-jf-text-secondary">
+                  Welcome back, <span className="font-semibold text-jf-text-primary">{user.name ?? user.email}</span>
+                </p>
+                <Link
+                  href="/dashboard"
+                  className="w-full py-2.5 px-4 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white font-semibold text-sm transition-colors text-center"
+                >
+                  Go to My Jellybox
+                </Link>
+                <div className="flex gap-4 text-xs text-jf-text-muted">
+                  <Link href="/dashboard/tags" className="hover:text-jf-primary transition-colors">Tags</Link>
+                  <Link href="/dashboard/devices" className="hover:text-jf-primary transition-colors">Devices</Link>
+                  <Link href="/dashboard/jellyfin" className="hover:text-jf-primary transition-colors">Jellyfin</Link>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
+                {signupEnabled && (
+                  <Link
+                    href="/auth/signup"
+                    className="px-6 py-3 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white font-semibold text-sm transition-colors"
+                  >
+                    Create free account
+                  </Link>
+                )}
+                <Link
+                  href="/auth/signin"
+                  className="px-6 py-3 rounded-lg border border-jf-border bg-jf-surface hover:bg-jf-elevated text-jf-text-primary font-semibold text-sm transition-colors"
+                >
+                  Sign in
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Product shot */}
+          <div className="order-1 lg:order-2 relative">
+            {/* Soft jellyfin-purple glow behind the image */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 blur-3xl opacity-60 pointer-events-none"
+              style={{
+                background:
+                  'radial-gradient(60% 60% at 50% 55%, rgba(170, 92, 194, 0.35), transparent 70%)',
+              }}
+            />
+            <div className="relative mx-auto max-w-md lg:max-w-none aspect-[4/5] rounded-3xl overflow-hidden border border-jf-border bg-jf-surface shadow-2xl">
+              <Image
+                src="/product.png"
+                alt="Jellybox device on a desk with four collectible figurines on coloured bases — a robot, dinosaur, wizard and cat."
+                fill
+                sizes="(max-width: 1024px) 90vw, 480px"
+                className="object-cover"
+                priority
+              />
             </div>
           </div>
-        ) : (
-          <div className="flex flex-col sm:flex-row gap-3">
-            {signupEnabled && (
-              <Link
-                href="/auth/signup"
-                className="px-6 py-3 rounded-lg bg-jf-primary hover:bg-jf-primary-hover text-white font-semibold text-sm transition-colors"
-              >
-                Create free account
-              </Link>
-            )}
-            <Link
-              href="/auth/signin"
-              className="px-6 py-3 rounded-lg border border-jf-border bg-jf-surface hover:bg-jf-elevated text-jf-text-primary font-semibold text-sm transition-colors"
-            >
-              Sign in
-            </Link>
-          </div>
-        )}
+        </div>
 
         {/* Feature grid */}
-        <div className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full text-left">
+        <div className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full text-left mx-auto">
           {features.map((feature) => (
             <div
               key={feature.title}
