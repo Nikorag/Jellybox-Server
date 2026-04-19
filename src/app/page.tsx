@@ -75,8 +75,10 @@ export default async function LandingPage() {
             </div>
 
             <h1 className="text-4xl sm:text-5xl font-extrabold text-jf-text-primary leading-tight mb-6">
-              Give kids{' '}
-              <span className="text-jf-primary">physical control</span>{' '}
+              Give kids
+              <br />
+              <span className="text-jf-primary whitespace-nowrap">physical control</span>
+              <br />
               of their media
             </h1>
 
