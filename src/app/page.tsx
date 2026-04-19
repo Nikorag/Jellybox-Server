@@ -68,7 +68,7 @@ export default async function LandingPage() {
       <main className="flex-1 flex flex-col px-4 py-16 sm:py-20">
         <div className="max-w-6xl w-full mx-auto grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           {/* Copy */}
-          <div className="text-center lg:text-left order-2 lg:order-1">
+          <div className="text-center lg:text-left">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-jf-primary-muted border border-jf-primary/30 text-jf-primary text-xs font-medium mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-jf-primary" />
               Companion app for Jellybox hardware
@@ -125,7 +125,7 @@ export default async function LandingPage() {
           </div>
 
           {/* Product shot */}
-          <div className="order-1 lg:order-2 relative">
+          <div className="relative">
             {/* Soft jellyfin-purple glow behind the image */}
             <div
               aria-hidden="true"
