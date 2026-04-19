@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
       {
         pathname: '/Icon.png',
       },
+      {
+        pathname: '/product.png',
+      },
     ],
     remotePatterns: [
       // Allow Jellyfin server images — patterns are added at runtime via env

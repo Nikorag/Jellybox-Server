@@ -7,6 +7,10 @@
 > SaaS companion app that links your Jellyfin server to physical RFID devices, letting children
 > play media by scanning tags — no apps, no passwords, no rabbit holes.
 
+<p align="center">
+  <img src="public/product.png" alt="A finished Jellybox device with its eInk screen, glowing NeoPixel ring, and a row of figurine tags in front of it." width="480" />
+</p>
+
 ---
 
 ## Overview
