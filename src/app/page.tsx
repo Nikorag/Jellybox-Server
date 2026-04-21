@@ -21,6 +21,18 @@ export default async function LandingPage() {
 
   const { signupEnabled } = getAuthProviderFlags()
 
+  const heroImages = [
+    {
+      src: '/product.png',
+      alt: 'Jellybox device on a desk with four collectible figurines on coloured bases — a robot, dinosaur, wizard and cat.',
+    },
+    {
+      src: '/product_two.png',
+      alt: 'Jellybox on a living-room console with a kids cartoon playing on the TV behind it — the eInk screen shows "Ready to scan".',
+    },
+  ]
+  const heroImage = heroImages[Math.floor(Math.random() * heroImages.length)]
+
   return (
     <div className="min-h-screen bg-jf-bg flex flex-col">
       {/* Header */}
@@ -137,8 +149,8 @@ export default async function LandingPage() {
             />
             <div className="relative mx-auto max-w-md lg:max-w-none aspect-[4/5] rounded-3xl overflow-hidden border border-jf-border bg-jf-surface shadow-2xl">
               <Image
-                src="/product.png"
-                alt="Jellybox device on a desk with four collectible figurines on coloured bases — a robot, dinosaur, wizard and cat."
+                src={heroImage.src}
+                alt={heroImage.alt}
                 fill
                 sizes="(max-width: 1024px) 90vw, 480px"
                 className="object-cover"
