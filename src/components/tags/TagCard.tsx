@@ -20,13 +20,16 @@ export default function TagCard({ tag }: { tag: RfidTag }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Images are proxied through /api/jellyfin/image so the request is
-  // authenticated and any custom Jellyfin headers (e.g. Cloudflare Access)
-  // are forwarded to the origin.
-  const imageUrl =
-    tag.jellyfinItemId && tag.jellyfinItemImageTag
-      ? `/api/jellyfin/image?itemId=${tag.jellyfinItemId}&tag=${tag.jellyfinItemImageTag}&width=600`
+  // Images are proxied through Jellybox so the request is authenticated and
+  // any custom upstream headers are forwarded.
+  const imageUrl = tag.jellyfinItemId && tag.jellyfinItemImageTag
+    ? `/api/jellyfin/image?itemId=${tag.jellyfinItemId}&tag=${tag.jellyfinItemImageTag}&width=600`
+    : tag.extensionId && tag.externalItemId
+      ? `/api/extensions/${tag.extensionId}/image?itemId=${encodeURIComponent(tag.externalItemId)}`
       : null
+
+  const itemTitle = tag.jellyfinItemTitle ?? tag.externalItemTitle ?? null
+  const itemTypeBadge = tag.jellyfinItemType ?? tag.externalItemType ?? null
 
   async function handleDelete() {
     setDeleting(true)
@@ -79,8 +82,8 @@ export default function TagCard({ tag }: { tag: RfidTag }) {
           <p className="text-sm font-medium text-jf-text-primary truncate mb-0.5">
             {truncate(tag.label, 30)}
           </p>
-          {tag.jellyfinItemTitle ? (
-            <p className="text-xs text-jf-text-muted truncate mb-1.5">{truncate(tag.jellyfinItemTitle, 28)}</p>
+          {itemTitle ? (
+            <p className="text-xs text-jf-text-muted truncate mb-1.5">{truncate(itemTitle, 28)}</p>
           ) : (
             <p className="text-xs text-jf-warning mb-1.5">No content assigned</p>
           )}
@@ -102,9 +105,9 @@ export default function TagCard({ tag }: { tag: RfidTag }) {
                   </svg>
                 </span>
               )}
-              {tag.jellyfinItemType && (
-                <Badge variant={typeBadgeVariant[tag.jellyfinItemType] ?? 'neutral'} className="text-[10px]">
-                  {tag.jellyfinItemType}
+              {itemTypeBadge && (
+                <Badge variant={typeBadgeVariant[itemTypeBadge.toUpperCase()] ?? 'neutral'} className="text-[10px]">
+                  {itemTypeBadge}
                 </Badge>
               )}
             </div>

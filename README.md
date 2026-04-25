@@ -4,8 +4,9 @@
   <img src="Jellybox.png" alt="Jellybox" width="120" />
 </p>
 
-> SaaS companion app that links your Jellyfin server to physical RFID devices, letting children
-> play media by scanning tags — no apps, no passwords, no rabbit holes.
+> SaaS companion app that links your Jellyfin server — plus any pluggable third-party media
+> extensions you write against the open HTTP contract — to physical RFID devices, letting
+> children play media by scanning tags. No apps, no passwords, no rabbit holes.
 
 <p align="center">
   <img src="public/product.png" alt="A finished Jellybox device with its eInk screen, glowing NeoPixel ring, and a row of figurine tags in front of it." width="480" />
@@ -16,9 +17,20 @@
 ## Overview
 
 Jellybox Server is a Next.js 16 application hosted on Vercel. Parents create an account, link
-their Jellyfin media server, pair physical Jellybox devices, and assign RFID tags to content.
-When a child scans a tag on the physical device, it calls the `/api/play` endpoint which triggers
-playback on the chosen Jellyfin client.
+their Jellyfin media server (and optionally connect to any registered extensions), pair physical
+Jellybox devices, and assign RFID tags to content from any of those sources. When a child scans
+a tag on the physical device, it calls the `/api/play` endpoint, which routes the request to the
+right backend (Jellyfin or an extension) without the device firmware needing to know which is
+which.
+
+### Extensions
+
+A tag's content can come from Jellyfin (built-in) or from a third-party HTTP **extension** an
+admin has registered. Extensions are out-of-process services (Lambda or Docker sidecar) that
+implement a fixed contract — see `src/lib/extensions/types.ts` and the working starter in
+`examples/extension-reference/`. Admin gating is controlled by the `ADMINS` env var. No
+third-party extensions ship with the project; the framework is the surface. Full contract
+details, OAuth flow, and gotchas are in [AGENTS.md](./AGENTS.md).
 
 ---
 
@@ -88,6 +100,8 @@ cp .env.example .env.local
 | `AUTH_DISABLE_GOOGLE`     | (Optional) Set `true` to disable Google sign-in entirely     | `false`                              |
 | `AUTH_DISABLE_SIGNUP`     | (Optional) Set `true` to disable account creation            | `false`                              |
 | `DISABLE_PUBLIC_PAGES`    | (Optional) Set `true` to hide the landing and docs pages from anonymous users | `false`                              |
+| `ADMINS`                  | (Optional) Comma-separated emails of users allowed to register/remove extensions. Empty/unset = closed | `you@example.com,partner@…`         |
+| `NEXT_DEV_ORIGINS`        | (Dev only) Comma-separated LAN hosts when running `next dev -H 0.0.0.0` so HMR/chunk fetches aren't blocked | `192.168.1.39`                       |
 
 ### 3. Database Setup
 
@@ -127,10 +141,12 @@ jellybox-server/
 │   │   │   ├── devices/       # Device management
 │   │   │   ├── tags/          # RFID tag management
 │   │   │   ├── jellyfin/      # Jellyfin integration
+│   │   │   ├── settings/      # Webhooks + extensions settings
 │   │   │   └── account/       # Profile & account settings
 │   │   ├── api/
 │   │   │   ├── play/          # POST /api/play — device playback trigger
 │   │   │   ├── jellyfin/      # Jellyfin proxy routes
+│   │   │   ├── extensions/    # Extension registry + per-user account routes
 │   │   │   └── health/        # GET /api/health
 │   │   └── page.tsx           # Landing page
 │   ├── auth.ts                # NextAuth v5 configuration
@@ -140,17 +156,22 @@ jellybox-server/
 │   │   ├── auth/              # Auth form components
 │   │   ├── dashboard/         # Dashboard-specific components
 │   │   ├── devices/           # Device management components
-│   │   ├── tags/              # Tag management + ContentPicker
+│   │   ├── tags/              # Tag management + ContentPicker + ExtensionContentPicker
 │   │   ├── jellyfin/          # Jellyfin connect + client components
+│   │   ├── extensions/        # Extension settings UI (admin + per-user)
 │   │   └── account/           # Account settings components
 │   └── lib/
 │       ├── db.ts              # Prisma singleton
 │       ├── crypto.ts          # AES encryption + bcrypt helpers
 │       ├── jellyfin.ts        # Jellyfin API client
+│       ├── extensions/        # Extension HTTP contract + client/server helpers
+│       ├── auth-flags.ts      # Env-driven auth/admin flags
 │       ├── rate-limit.ts      # DB-backed rate limiter
 │       ├── email.ts           # Resend email helpers
 │       ├── utils.ts           # Utility functions (cn, formatDate…)
 │       └── constants.ts       # App-wide constants
+├── examples/
+│   └── extension-reference/   # Runnable starter — implements the full contract with canned data
 ├── e2e/                       # Playwright tests
 ├── .storybook/                # Storybook config
 └── src/__tests__/             # Jest unit tests

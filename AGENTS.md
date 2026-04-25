@@ -25,17 +25,23 @@ Read it before making changes. Update it after every meaningful change.
 │                    │  (Neon PG)     │                           │
 │                    └────────────────┘                           │
 └─────────────────────────────────────────────────────────────────┘
-                             │
-                    ┌────────────────┐
-                    │ Jellyfin Server│  (user-hosted, external)
-                    │ REST API       │
-                    └────────────────┘
-                             ▲
-                    ┌────────────────┐
-                    │ Jellybox Device│  (physical hardware)
-                    │ POST /api/play │
-                    └────────────────┘
+                  │                          │
+         ┌────────────────┐         ┌──────────────────┐
+         │ Jellyfin Server│         │  Extension(s)    │  (Lambda or sidecar)
+         │ REST API       │         │  HTTP contract   │
+         └────────────────┘         │  (any media      │
+                  ▲                 │   source)        │
+                  │                 └──────────────────┘
+         ┌────────────────┐
+         │ Jellybox Device│  (physical hardware)
+         │ POST /api/play │
+         └────────────────┘
 ```
+
+A tag can be backed by either Jellyfin (the built-in integration) or an
+**extension** — a third-party HTTP service that implements a fixed contract.
+The device firmware doesn't change between sources; `/api/play` routes the
+request to the right backend based on the tag's source.
 
 ---
 
@@ -85,6 +91,9 @@ jellybox-server/
 │   │   │   │   └── actions.ts # createTag, updateTag, deleteTag
 │   │   │   ├── jellyfin/      # /dashboard/jellyfin + /clients
 │   │   │   │   └── actions.ts # unlinkServer, saveClient, deleteClient
+│   │   │   ├── settings/
+│   │   │   │   ├── webhooks/  # /dashboard/settings/webhooks
+│   │   │   │   └── extensions/ # /dashboard/settings/extensions + /oauth-callback
 │   │   │   └── account/       # /dashboard/account
 │   │   │       └── actions.ts # updateProfile, changePassword, deleteAccount, clearLog
 │   │   ├── api/
@@ -93,6 +102,11 @@ jellybox-server/
 │   │   │   │   ├── connect/route.ts   # POST — link/validate Jellyfin server
 │   │   │   │   ├── library/route.ts   # GET  — proxy library browse
 │   │   │   │   └── clients/route.ts   # GET  — list active Jellyfin sessions
+│   │   │   ├── extensions/            # See "Extensions framework" below
+│   │   │   │   ├── route.ts           # GET list / POST register (admin)
+│   │   │   │   ├── [id]/              # delete (admin), connect, clients,
+│   │   │   │   │   …                  # account, search, image, refresh-manifest, oauth/start
+│   │   │   │   └── oauth/complete/    # POST — finish OAuth, mint ExtensionAccount
 │   │   │   └── health/route.ts        # GET  — health check
 │   │   ├── layout.tsx         # Root layout (fonts, metadata, SessionProvider)
 │   │   ├── page.tsx           # Landing page (public)
@@ -104,13 +118,21 @@ jellybox-server/
 │   │   ├── auth/              # SignInForm, SignUpForm, VerifyEmailView…
 │   │   ├── dashboard/         # DashboardNav, OverviewStats, RecentActivityFeed
 │   │   ├── devices/           # DeviceCard, PairDeviceFlow, ApiKeyDisplay, DeviceDetail
-│   │   ├── tags/              # TagGrid, TagCard, TagForm, ContentPicker
+│   │   ├── tags/              # TagGrid, TagCard, TagForm, ContentPicker, ExtensionContentPicker
 │   │   ├── jellyfin/          # JellyfinConnectForm, JellyfinStatusCard, JellyfinClientList
+│   │   ├── extensions/        # ExtensionsSettings, AddExtensionForm, ExtensionCard
 │   │   └── account/           # AccountSettings
 │   └── lib/
 │       ├── db.ts              # Prisma singleton (globalThis pattern for dev hot-reload)
 │       ├── crypto.ts          # encrypt/decrypt (AES-256-GCM), hashSecret, generateDeviceApiKey
 │       ├── jellyfin.ts        # Jellyfin API client + JellyfinApiError
+│       ├── extensions/        # Extension framework — see "Extensions framework" section
+│       │   ├── types.ts       # HTTP contract types (manifest, MediaItem, PlayResult, …)
+│       │   ├── client.ts      # fetchManifest, authenticateComplete, authenticateStart,
+│       │   │                  # authenticateExchange, search, getItem, getImage, getClients, play
+│       │   └── server.ts      # requireSession, loadExtension, loadOwnAccount,
+│       │                      # encodeOAuthState/decodeOAuthState, publicOrigin
+│       ├── auth-flags.ts      # Env-driven auth flags + isExtensionsAdmin(email)
 │       ├── rate-limit.ts      # DB-backed sliding window rate limiter
 │       ├── email.ts           # Resend: sendVerificationEmail, sendPasswordResetEmail
 │       ├── utils.ts           # cn(), formatDate(), formatRelativeTime(), getInitials()
@@ -123,8 +145,10 @@ jellybox-server/
 │   ├── devices.spec.ts
 │   ├── tags.spec.ts
 │   └── play-api.spec.ts
+├── examples/
+│   └── extension-reference/   # Runnable reference implementation of the extension contract
 └── src/__tests__/
-    ├── lib/                   # crypto.test.ts, utils.test.ts
+    ├── lib/                   # crypto.test.ts, utils.test.ts, extensions/client.test.ts
     ├── api/                   # health.test.ts, play.test.ts, jellyfin-connect.test.ts
     └── actions/               # devices.test.ts, tags.test.ts
 ```
@@ -210,16 +234,101 @@ See `prisma/schema.prisma` for the authoritative schema. Key relationships:
 User
  ├── JellyfinServer (0..1)
  │    └── JellyfinClient[] (0..n)
+ ├── ExtensionAccount[] (0..n)         # this user's connections to extensions
+ │    └── extension → Extension
+ ├── addedExtensions: Extension[]      # audit only — extensions this admin added
  ├── Device[] (0..n)
  │    └── defaultClient → JellyfinClient?
  ├── RfidTag[] (0..n)
+ │    └── extension? → Extension       # alternative to jellyfin* fields
  └── ActivityLog[] (0..n)
       ├── device? → Device
       └── rfidTag? → RfidTag
+
+Extension (system-wide)
+ ├── addedBy? → User                   # admin who registered it
+ └── accounts: ExtensionAccount[]      # one row per user who's connected
 ```
 
+**Extensions are system-wide**, not user-scoped. Admins (see `ADMINS` env)
+register an extension once; every user can then connect their own
+`ExtensionAccount` to it. A `RfidTag` is either Jellyfin-backed
+(`jellyfinItemId` set) or extension-backed (`extensionId` + `externalItemId`
+set) — never both. The play route branches on which fields are populated.
+
 **Important:** `ActivityLog` snapshots `deviceName` and `jellyfinItemTitle` at write time. This
-means logs remain readable after devices or tags are deleted.
+means logs remain readable after devices or tags are deleted. For
+extension-backed tags the external item title is also stored in
+`jellyfinItemTitle` for v1 — renaming that column is a future cleanup.
+
+---
+
+## Extensions framework
+
+Extensions are out-of-process HTTP services that let Jellybox play media from
+sources other than Jellyfin. They can be hosted as Lambda functions or as
+self-hosted sidecars on the same Docker network as Jellybox — they never need
+to be publicly reachable. No third-party extensions ship with the project
+today; the framework is the surface.
+
+### Registration model
+
+- **System-wide.** An admin (email listed in the `ADMINS` env var, comma
+  separated, case-insensitive) registers an extension by URL. Jellybox fetches
+  `/manifest`, generates a one-time bearer secret, and persists the row.
+- **Per-user accounts.** Once registered, every user can connect their own
+  account to that extension. The user's credentials live entirely inside the
+  extension; Jellybox stores only the opaque `accountId` the extension hands
+  back.
+- **Empty `ADMINS` = closed.** If `ADMINS` is unset, no one can register
+  extensions.
+
+### HTTP contract (extension implements)
+
+Defined in `src/lib/extensions/types.ts`. Every route except `/manifest` is
+authenticated with `Authorization: Bearer <secret>`.
+
+| Method | Path                       | When called                              |
+|--------|----------------------------|------------------------------------------|
+| GET    | `/manifest`                | Registration + manifest refresh          |
+| POST   | `/authenticate/start`      | OAuth only — return provider URL         |
+| POST   | `/authenticate/exchange`   | OAuth only — swap code for accountId     |
+| POST   | `/authenticate/complete`   | Credentials only — fields → accountId    |
+| POST   | `/search`                  | Tag picker UI                            |
+| GET    | `/item`                    | (reserved)                               |
+| GET    | `/image`                   | Tag artwork (proxied through Jellybox)   |
+| GET    | `/clients`                 | Default-client picker in settings        |
+| POST   | `/play`                    | `/api/play` round-trip                   |
+
+`authFlow: 'credentials' | 'oauth'` in the manifest tells Jellybox which auth
+endpoints to use. Refresh tokens are entirely the extension's responsibility —
+Jellybox never sees them.
+
+### OAuth flow (Jellybox-hosted callback)
+
+1. User clicks Connect → `POST /api/extensions/[id]/oauth/start`.
+2. Jellybox mints encrypted state and calls extension `/authenticate/start
+   { state, callbackUrl: <Jellybox callback URL> }`.
+3. Browser is full-page redirected to the provider URL the extension returned.
+4. Provider redirects back to `${origin}/dashboard/settings/extensions/oauth-callback?state=…&code=…`.
+5. Callback page POSTs `{ state, code }` to `/api/extensions/oauth/complete`.
+6. Server decodes state, calls extension `/authenticate/exchange { code, callbackUrl }` server-to-server.
+7. Extension returns `{ accountId, displayName }`; Jellybox upserts `ExtensionAccount`.
+
+State is encrypted with the existing `JELLYFIN_ENCRYPTION_KEY` and self-expiring (10 min) — no DB table needed.
+
+### Reference extension
+
+`examples/extension-reference/server.mjs` is a tiny stand-alone Node script
+that implements the full contract with canned data. Run with
+`AUTH_FLOW=oauth node server.mjs` to exercise the OAuth path (with a fake
+provider screen). Use it as the test harness for changes to the contract.
+
+### Environment
+
+- `ADMINS` — comma-separated list of admin emails. Empty/unset = closed.
+- `NEXT_DEV_ORIGINS` — comma-separated list of LAN hosts when running
+  `next dev -H 0.0.0.0` (otherwise Next.js blocks HMR/chunk fetches).
 
 ---
 
@@ -233,10 +342,12 @@ means logs remain readable after devices or tags are deleted.
 | `AUTH_URL`                | App base URL for NextAuth callbacks           | Vercel dashboard / .env|
 | `AUTH_GOOGLE_ID`          | Google OAuth client ID                        | Vercel dashboard / .env|
 | `AUTH_GOOGLE_SECRET`      | Google OAuth client secret                    | Vercel dashboard / .env|
-| `JELLYFIN_ENCRYPTION_KEY` | 64-char hex key for encrypting Jellyfin tokens| Vercel dashboard / .env|
+| `JELLYFIN_ENCRYPTION_KEY` | 64-char hex key — encrypts Jellyfin tokens AND OAuth state | Vercel dashboard / .env|
 | `RESEND_API_KEY`          | Resend API key for transactional email        | Vercel dashboard / .env|
 | `EMAIL_FROM`              | Verified sender address for Resend            | Vercel dashboard / .env|
 | `NEXT_PUBLIC_APP_URL`     | Public URL (used in email links)              | Vercel dashboard / .env|
+| `ADMINS`                  | Comma-separated admin emails for extension management. Empty/unset = closed | Vercel dashboard / .env|
+| `NEXT_DEV_ORIGINS`        | (Dev only) Comma-separated LAN hosts allowed when running `next dev -H 0.0.0.0` | `.env.local`        |
 
 ⚠ **Never change `JELLYFIN_ENCRYPTION_KEY` in production** — doing so will invalidate every
 stored Jellyfin API token and require all users to re-link their servers.
@@ -308,6 +419,24 @@ E2E tests use a real database — `e2e/global-setup.ts` seeds the test user.
 3. Add required env vars to `.env.example` and `AGENTS.md`.
 4. Update the sign-in page / form if the provider needs a custom button.
 
+### Building a new media extension
+
+Extensions live outside this repo — they're standalone HTTP services.
+`examples/extension-reference/server.mjs` is the canonical starter.
+
+1. Implement the routes listed under "Extensions framework" above. Types are
+   in `src/lib/extensions/types.ts`.
+2. Choose `authFlow: 'credentials'` (form fields, posted to
+   `/authenticate/complete`) or `'oauth'` (extension hosts `/authenticate/start`
+   + `/authenticate/exchange`; Jellybox hosts the browser callback).
+3. Persist the access/refresh tokens you receive keyed by the `accountId` you
+   return. Refresh transparently on each call; return `AUTH_ERROR` when refresh
+   itself fails so the user knows to reconnect.
+4. Verify `Authorization: Bearer <secret>` on every protected route — the
+   secret is shown to the admin once at registration time.
+5. Test against a running Jellybox by adding the URL at
+   `/dashboard/settings/extensions` (must be signed in as an admin).
+
 ---
 
 ## Known Gotchas & Constraints
@@ -329,6 +458,20 @@ E2E tests use a real database — `e2e/global-setup.ts` seeds the test user.
 8. **Rate limiting is DB-backed:** The rate limiter counts `ActivityLog` entries (including failed ones) per device per minute. This is intentional — it limits overall API call volume per device, not just successful plays.
 
 9. **`useActionState` requires `'use client'` and React 19:** All form components using server actions must be client components.
+
+10. **Extension callback URL respects `Host` / `X-Forwarded-Host`:** OAuth and
+    image-proxy URLs are derived from the inbound request headers via
+    `publicOrigin()` in `src/lib/extensions/server.ts`. Don't switch back to
+    `req.url` — bind addresses like `0.0.0.0` (used by `next dev -H 0.0.0.0`)
+    leak into the URL handed to the OAuth provider.
+
+11. **OAuth state is encrypted with `JELLYFIN_ENCRYPTION_KEY`:** Rotating this
+    key invalidates not only stored Jellyfin tokens but also any in-flight
+    OAuth flows (which expire in 10 minutes anyway).
+
+12. **Extension secret shown once:** Like device API keys, the bearer secret
+    Jellybox sends to extensions is shown only at registration. The admin
+    pastes it into the extension's own config out-of-band.
 
 ---
 

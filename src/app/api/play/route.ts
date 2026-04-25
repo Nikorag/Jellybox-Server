@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { verifySecret, decrypt } from '@/lib/crypto'
 import { jellyfinGetSessions, jellyfinPlay, jellyfinGetRandomEpisode, jellyfinGetNextEpisode, JellyfinApiError } from '@/lib/jellyfin'
+import { ExtensionApiError, play as extensionPlay } from '@/lib/extensions/client'
+import type { Extension } from '@prisma/client'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { isWithinOperatingHours } from '@/lib/utils'
 import { PLAY_ERROR, WEBHOOK_MAX_WAIT_SECONDS } from '@/lib/constants'
@@ -156,12 +158,18 @@ export async function POST(req: Request) {
       jellyfinItemId: true,
       jellyfinItemType: true,
       jellyfinItemTitle: true,
+      extensionId: true,
+      externalItemId: true,
+      externalItemType: true,
+      externalItemTitle: true,
       resumePlayback: true,
       shuffle: true,
     },
   })
 
-  if (!tag?.jellyfinItemId) {
+  const isExtensionTag = !!tag?.extensionId && !!tag.externalItemId
+
+  if (!tag || (!tag.jellyfinItemId && !isExtensionTag)) {
     await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, null, false, PLAY_ERROR.UNASSIGNED)
     return NextResponse.json(
       { error: 'Tag not found or has no content assigned.', code: PLAY_ERROR.UNASSIGNED },
@@ -169,50 +177,110 @@ export async function POST(req: Request) {
     )
   }
 
-  // ── 10. Determine playback client ──────────────────────────────────────────
-  const client = matchedDevice.defaultClient
-  if (!client) {
-    await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, PLAY_ERROR.NO_CLIENT)
-    return NextResponse.json(
-      { error: 'No default playback client configured for this device.', code: PLAY_ERROR.NO_CLIENT },
-      { status: 422 },
-    )
+  // Synthetic shape used by logActivity (which captures itemTitle into the
+  // jellyfinItemTitle column for both sources in v1).
+  const tagForLog = {
+    id: tag.id,
+    jellyfinItemTitle: isExtensionTag ? tag.externalItemTitle : tag.jellyfinItemTitle,
+  }
+  const tagLabel = tagForLog.jellyfinItemTitle ?? tagId
+
+  // ── 10. Build a "doPlay" closure for the matching backend ────────────────
+  let doPlay: () => Promise<PlaySuccess | PlayFailure>
+
+  if (isExtensionTag) {
+    // Resolve the device owner's connected account for this extension.
+    // Partners using the owner's device naturally use the owner's credentials.
+    const [extension, account] = await Promise.all([
+      db.extension.findUnique({ where: { id: tag.extensionId! } }),
+      db.extensionAccount.findUnique({
+        where: {
+          extensionId_userId: {
+            extensionId: tag.extensionId!,
+            userId: matchedDevice.user.id,
+          },
+        },
+      }),
+    ])
+    if (!extension || !account) {
+      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, PLAY_ERROR.OFFLINE)
+      return NextResponse.json(
+        { error: 'Extension is not connected for this account.', code: PLAY_ERROR.OFFLINE },
+        { status: 503 },
+      )
+    }
+    const manifest = extension.manifest as { capabilities?: { listClients?: boolean } } | null
+    const requiresClient = manifest?.capabilities?.listClients !== false
+    if (requiresClient && !account.defaultClientId) {
+      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, PLAY_ERROR.NO_CLIENT)
+      return NextResponse.json(
+        { error: 'No default playback client set for this extension.', code: PLAY_ERROR.NO_CLIENT },
+        { status: 422 },
+      )
+    }
+    doPlay = () =>
+      attemptExtensionPlay({
+        extension,
+        accountId: account.accountId,
+        clientId: account.defaultClientId,
+        externalItemId: tag.externalItemId!,
+        title: tag.externalItemTitle ?? undefined,
+        flags: { resumePlayback: tag.resumePlayback, shuffle: tag.shuffle },
+      })
+  } else {
+    const client = matchedDevice.defaultClient
+    if (!client) {
+      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, PLAY_ERROR.NO_CLIENT)
+      return NextResponse.json(
+        { error: 'No default playback client configured for this device.', code: PLAY_ERROR.NO_CLIENT },
+        { status: 422 },
+      )
+    }
+
+    const server = await db.jellyfinServer.findUnique({
+      where: { userId: matchedDevice.user.id },
+    })
+
+    if (!server) {
+      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, PLAY_ERROR.OFFLINE)
+      return NextResponse.json(
+        { error: 'No Jellyfin server linked to this account.', code: PLAY_ERROR.OFFLINE },
+        { status: 503 },
+      )
+    }
+
+    const apiToken = decrypt(server.apiToken)
+    const customHeaders = server.customHeaders
+      ? (() => { try { return JSON.parse(decrypt(server.customHeaders!)) as Record<string, string> } catch { return {} } })()
+      : {}
+
+    doPlay = () =>
+      attemptPlay({
+        deviceId: matchedDevice.id,
+        userId: matchedDevice.user.id,
+        deviceName: matchedDevice.name,
+        tagId,
+        tag: {
+          id: tag.id,
+          jellyfinItemId: tag.jellyfinItemId,
+          jellyfinItemType: tag.jellyfinItemType,
+          jellyfinItemTitle: tag.jellyfinItemTitle,
+          resumePlayback: tag.resumePlayback,
+          shuffle: tag.shuffle,
+        },
+        client,
+        server,
+        apiToken,
+        customHeaders,
+      })
   }
 
-  // ── 11. Get Jellyfin server + find live session ────────────────────────────
-  const server = await db.jellyfinServer.findUnique({
-    where: { userId: matchedDevice.user.id },
-  })
-
-  if (!server) {
-    await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, PLAY_ERROR.OFFLINE)
-    return NextResponse.json(
-      { error: 'No Jellyfin server linked to this account.', code: PLAY_ERROR.OFFLINE },
-      { status: 503 },
-    )
-  }
-
-  const apiToken = decrypt(server.apiToken)
-  const customHeaders = server.customHeaders
-    ? (() => { try { return JSON.parse(decrypt(server.customHeaders!)) as Record<string, string> } catch { return {} } })()
-    : {}
-
-  // ── 12. Attempt playback (with optional webhook retry) ────────────────────
-  const result = await attemptPlay({
-    deviceId: matchedDevice.id,
-    userId: matchedDevice.user.id,
-    deviceName: matchedDevice.name,
-    tagId,
-    tag,
-    client,
-    server,
-    apiToken,
-    customHeaders,
-  })
+  // ── 11. Attempt playback (with optional webhook retry) ────────────────────
+  const result = await doPlay()
 
   const webhookContext = {
     deviceName: matchedDevice.name,
-    tagLabel: tag.jellyfinItemTitle ?? tagId,
+    tagLabel,
   }
 
   if (result.type === 'success') {
@@ -221,7 +289,7 @@ export async function POST(req: Request) {
       where: { id: matchedDevice.id },
       data: { lastPlayedAt: new Date() },
     })
-    await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
+    await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, true, null)
     // Fire TAG_SCANNED webhooks (best-effort, no retry)
     void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', {
       ...webhookContext,
@@ -252,24 +320,14 @@ export async function POST(req: Request) {
       await new Promise((r) => setTimeout(r, waitSeconds * 1000))
 
       // Retry play once
-      const retry = await attemptPlay({
-        deviceId: matchedDevice.id,
-        userId: matchedDevice.user.id,
-        deviceName: matchedDevice.name,
-        tagId,
-        tag,
-        client,
-        server,
-        apiToken,
-        customHeaders,
-      })
+      const retry = await doPlay()
 
       if (retry.type === 'success') {
         await db.device.update({
           where: { id: matchedDevice.id },
           data: { lastPlayedAt: new Date() },
         })
-        await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, true, null)
+        await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, true, null)
         void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', {
           ...webhookContext,
           contentTitle: retry.content,
@@ -277,7 +335,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, content: retry.content })
       }
 
-      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, retry.code)
+      await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, retry.code)
       void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', {
         ...webhookContext,
         errorCode: retry.code,
@@ -289,7 +347,7 @@ export async function POST(req: Request) {
     }
   }
 
-  await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tag, false, result.code)
+  await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, result.code)
   void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', {
     ...webhookContext,
     errorCode: result.code,
@@ -376,6 +434,60 @@ async function attemptPlay({
       ? PLAY_ERROR.AUTH_ERROR
       : PLAY_ERROR.OFFLINE
     return { type: 'failure', code, message: err instanceof Error ? err.message : 'Jellyfin error.' }
+  }
+}
+
+// ── attemptExtensionPlay ──────────────────────────────────────────────────────
+
+async function attemptExtensionPlay({
+  extension,
+  accountId,
+  clientId,
+  externalItemId,
+  title,
+  flags,
+}: {
+  extension: Extension
+  accountId: string
+  clientId: string | null
+  externalItemId: string
+  title?: string
+  flags: { resumePlayback: boolean; shuffle: boolean }
+}): Promise<PlaySuccess | PlayFailure> {
+  try {
+    const result = await extensionPlay(extension, accountId, externalItemId, clientId, flags)
+    if (result.ok) {
+      return { type: 'success', content: title }
+    }
+    // Extension reported a structured failure — pass through, mapping its codes.
+    return {
+      type: 'failure',
+      code: mapExtensionCode(result.code),
+      message: result.message,
+    }
+  } catch (err) {
+    const code =
+      err instanceof ExtensionApiError && err.isAuthError
+        ? PLAY_ERROR.AUTH_ERROR
+        : PLAY_ERROR.OFFLINE
+    return {
+      type: 'failure',
+      code,
+      message: err instanceof Error ? err.message : 'Extension error.',
+    }
+  }
+}
+
+function mapExtensionCode(code: 'OFFLINE' | 'NO_CLIENT' | 'AUTH_ERROR' | 'UNKNOWN'): string {
+  switch (code) {
+    case 'OFFLINE':
+      return PLAY_ERROR.OFFLINE
+    case 'NO_CLIENT':
+      return PLAY_ERROR.NO_CLIENT
+    case 'AUTH_ERROR':
+      return PLAY_ERROR.AUTH_ERROR
+    default:
+      return PLAY_ERROR.UNKNOWN
   }
 }
 

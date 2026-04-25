@@ -1,3 +1,6 @@
+/**
+ * @jest-environment node
+ */
 import { POST } from '@/app/api/play/route'
 import { PLAY_ERROR } from '@/lib/constants'
 
@@ -11,6 +14,9 @@ jest.mock('@/lib/db', () => ({
     },
     rfidTag: { findFirst: jest.fn() },
     jellyfinServer: { findUnique: jest.fn() },
+    extension: { findUnique: jest.fn() },
+    extensionAccount: { findUnique: jest.fn() },
+    webhook: { findMany: jest.fn().mockResolvedValue([]) },
     activityLog: {
       create: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
@@ -37,9 +43,23 @@ jest.mock('@/lib/jellyfin', () => ({
   },
 }))
 
+jest.mock('@/lib/extensions/client', () => ({
+  play: jest.fn(),
+  ExtensionApiError: class ExtensionApiError extends Error {
+    statusCode: number
+    constructor(statusCode: number, message: string) {
+      super(message)
+      this.statusCode = statusCode
+    }
+    get isAuthError() { return this.statusCode === 401 }
+    get isUnreachable() { return this.statusCode === 0 }
+  },
+}))
+
 const { db } = jest.requireMock('@/lib/db')
 const { verifySecret } = jest.requireMock('@/lib/crypto')
 const { jellyfinGetSessions, jellyfinPlay } = jest.requireMock('@/lib/jellyfin')
+const { play: extensionPlay } = jest.requireMock('@/lib/extensions/client')
 
 function makeRequest(body: unknown, apiKey?: string) {
   return new Request('http://localhost/api/play', {
@@ -152,5 +172,102 @@ describe('POST /api/play', () => {
     expect(res.status).toBe(429)
     const body = await res.json()
     expect(body.code).toBe(PLAY_ERROR.RATE_LIMITED)
+  })
+
+  describe('extension-backed tags', () => {
+    const extensionTag = {
+      id: 'tag-2',
+      jellyfinItemId: null,
+      jellyfinItemType: null,
+      jellyfinItemTitle: null,
+      extensionId: 'ext-1',
+      externalItemId: 'demo-item-1',
+      externalItemType: 'film',
+      externalItemTitle: 'Demo Film',
+      resumePlayback: false,
+      shuffle: false,
+    }
+
+    const mockExtension = {
+      id: 'ext-1',
+      name: 'Demo',
+      baseUrl: 'http://ext',
+      secret: 'enc',
+      manifest: { capabilities: { listClients: true } },
+      addedByUserId: null,
+    }
+
+    const mockAccount = {
+      id: 'acc-row',
+      extensionId: 'ext-1',
+      userId: 'user-1',
+      accountId: 'demo-account',
+      displayName: 'Demo',
+      defaultClientId: 'demo-client',
+    }
+
+    beforeEach(() => {
+      db.device.findMany.mockResolvedValue([mockDevice])
+      verifySecret.mockResolvedValue(true)
+      db.rfidTag.findFirst.mockResolvedValue(extensionTag)
+    })
+
+    it('forwards play to the extension when the tag is extension-backed', async () => {
+      db.extension.findUnique.mockResolvedValue(mockExtension)
+      db.extensionAccount.findUnique.mockResolvedValue(mockAccount)
+      extensionPlay.mockResolvedValue({ ok: true })
+
+      const res = await POST(makeRequest({ tagId: 'A1B2C3D4' }, 'jb_validkey1234567890'))
+      expect(res.status).toBe(200)
+      const body = await res.json()
+      expect(body.success).toBe(true)
+      expect(body.content).toBe('Demo Film')
+      // Account is resolved by (extensionId, deviceOwner.userId).
+      expect(db.extensionAccount.findUnique).toHaveBeenCalledWith({
+        where: { extensionId_userId: { extensionId: 'ext-1', userId: 'user-1' } },
+      })
+      expect(extensionPlay).toHaveBeenCalledWith(
+        mockExtension,
+        'demo-account',
+        'demo-item-1',
+        'demo-client',
+        { resumePlayback: false, shuffle: false },
+      )
+      // Jellyfin path must not be touched.
+      expect(jellyfinGetSessions).not.toHaveBeenCalled()
+      expect(jellyfinPlay).not.toHaveBeenCalled()
+    })
+
+    it('maps extension OFFLINE to PLAY_ERROR.OFFLINE', async () => {
+      db.extension.findUnique.mockResolvedValue(mockExtension)
+      db.extensionAccount.findUnique.mockResolvedValue(mockAccount)
+      extensionPlay.mockResolvedValue({ ok: false, code: 'OFFLINE', message: 'Device offline' })
+
+      const res = await POST(makeRequest({ tagId: 'A1B2C3D4' }, 'jb_validkey1234567890'))
+      expect(res.status).toBe(503)
+      const body = await res.json()
+      expect(body.code).toBe(PLAY_ERROR.OFFLINE)
+    })
+
+    it('returns NO_CLIENT when the user has no default client', async () => {
+      db.extension.findUnique.mockResolvedValue(mockExtension)
+      db.extensionAccount.findUnique.mockResolvedValue({ ...mockAccount, defaultClientId: null })
+
+      const res = await POST(makeRequest({ tagId: 'A1B2C3D4' }, 'jb_validkey1234567890'))
+      expect(res.status).toBe(422)
+      const body = await res.json()
+      expect(body.code).toBe(PLAY_ERROR.NO_CLIENT)
+      expect(extensionPlay).not.toHaveBeenCalled()
+    })
+
+    it('returns OFFLINE when the user is not connected to the extension', async () => {
+      db.extension.findUnique.mockResolvedValue(mockExtension)
+      db.extensionAccount.findUnique.mockResolvedValue(null)
+
+      const res = await POST(makeRequest({ tagId: 'A1B2C3D4' }, 'jb_validkey1234567890'))
+      expect(res.status).toBe(503)
+      const body = await res.json()
+      expect(body.code).toBe(PLAY_ERROR.OFFLINE)
+    })
   })
 })
