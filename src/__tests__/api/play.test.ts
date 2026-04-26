@@ -85,7 +85,7 @@ const mockDevice = {
 const mockTag = {
   id: 'tag-1',
   jellyfinItemId: 'item-1',
-  jellyfinItemTitle: 'The Lion King',
+  jellyfinItemTitle: 'The Silver Paw',
 }
 
 const mockServer = {
@@ -157,7 +157,7 @@ describe('POST /api/play', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
-    expect(body.content).toBe('The Lion King')
+    expect(body.content).toBe('The Silver Paw')
     expect(db.activityLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ success: true }) }),
     )

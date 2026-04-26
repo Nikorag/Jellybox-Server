@@ -49,7 +49,8 @@ model User {
   /// Grace period in seconds before the same device can trigger playback again
   scanDebounceSeconds Int @default(5)
 
-  webhooks Webhook[]
+  webhooks             Webhook[]
+  notificationChannels NotificationChannel[]
 
   @@map("users")
 }
@@ -334,6 +335,37 @@ model Webhook {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("webhooks")
+}
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+enum NotificationType {
+  NTFY
+  DISCORD
+  SLACK
+}
+
+enum NotificationEvent {
+  TAG_SCANNED
+  PLAYBACK_FAILED
+}
+
+model NotificationChannel {
+  id      String              @id @default(cuid())
+  userId  String
+  type    NotificationType
+  label   String
+  enabled Boolean             @default(true)
+  events  NotificationEvent[]
+  /// AES-256-GCM encrypted JSON config (shape varies by type)
+  config  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_channels")
 }
 
 // ─── Activity Logs ───────────────────────────────────────────────────────────

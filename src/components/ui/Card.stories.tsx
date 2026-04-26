@@ -42,7 +42,7 @@ export const Hoverable: Story = {
   render: () => (
     <Card hoverable style={{ width: 240 }}>
       <CardContent>
-        <p className="text-jf-text-primary font-medium">The Lion King</p>
+        <p className="text-jf-text-primary font-medium">The Silver Paw</p>
         <p className="text-xs text-jf-text-muted mt-1">Tag: A1B2C3D4</p>
       </CardContent>
     </Card>

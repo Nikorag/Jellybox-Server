@@ -32,7 +32,7 @@ describe('getInitials', () => {
   })
 
   it('handles single name', () => {
-    expect(getInitials('Moana')).toBe('M')
+    expect(getInitials('Marina')).toBe('M')
   })
 
   it('returns ? for null', () => {

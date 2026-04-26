@@ -311,7 +311,7 @@ export default function TagForm({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               required
-              placeholder="e.g. The Lion King disc"
+              placeholder="e.g. The Silver Paw disc"
               helperText="A friendly name to identify this tag."
             />
 

@@ -11,11 +11,18 @@ import ContextSwitcher from './ContextSwitcher'
 
 type ContextAccount = { id: string; name: string | null; email: string; image?: string | null }
 
-interface NavItem {
+interface SubNavItem {
   href: string
+  label: string
+  ownerOnly?: boolean
+}
+
+interface NavItem {
+  href?: string
   label: string
   icon: React.ReactNode
   ownerOnly?: boolean
+  children?: SubNavItem[]
 }
 
 const navItems: NavItem[] = [
@@ -61,48 +68,23 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    href: '/dashboard/account',
-    label: 'Account',
+    label: 'Settings',
     ownerOnly: true,
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/dashboard/partners',
-    label: 'Partners',
-    ownerOnly: true,
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     ),
-  },
-  {
-    href: '/dashboard/settings/webhooks',
-    label: 'Webhooks',
-    ownerOnly: true,
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-      </svg>
-    ),
-  },
-  {
-    href: '/dashboard/settings/extensions',
-    label: 'Extensions',
-    ownerOnly: true,
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-          d="M14 10V5a2 2 0 00-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2h5m4-4h5a2 2 0 012 2v5a2 2 0 01-2 2h-5a2 2 0 01-2-2v-5a2 2 0 012-2zm-4-4l4 4-4 4" />
-      </svg>
-    ),
+    children: [
+      { href: '/dashboard/account', label: 'Account', ownerOnly: true },
+      { href: '/dashboard/partners', label: 'Partners', ownerOnly: true },
+      { href: '/dashboard/settings/notifications', label: 'Notifications', ownerOnly: true },
+      { href: '/dashboard/settings/webhooks', label: 'Webhooks', ownerOnly: true },
+      { href: '/dashboard/settings/extensions', label: 'Extensions', ownerOnly: true },
+    ],
   },
   {
     href: '/dashboard/about',
@@ -114,6 +96,14 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
+]
+
+const settingsChildPaths = [
+  '/dashboard/account',
+  '/dashboard/partners',
+  '/dashboard/settings/notifications',
+  '/dashboard/settings/webhooks',
+  '/dashboard/settings/extensions',
 ]
 
 function NavContent({
@@ -137,6 +127,9 @@ function NavContent({
   selfImage?: string | null
   onNavigate?: () => void
 }) {
+  const isOnSettingsPath = settingsChildPaths.some((p) => pathname.startsWith(p))
+  const [settingsOpen, setSettingsOpen] = useState(isOnSettingsPath)
+
   return (
     <>
       {/* Context switcher */}
@@ -153,15 +146,66 @@ function NavContent({
       {/* Nav items */}
       <div className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {visibleItems.map((item) => {
+          if (item.children) {
+            const isChildActive = item.children.some((c) => pathname.startsWith(c.href))
+            return (
+              <div key={item.label}>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen((o) => !o)}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                    isChildActive
+                      ? 'bg-jf-primary-muted text-jf-primary'
+                      : 'text-jf-text-secondary hover:bg-jf-elevated hover:text-jf-text-primary',
+                  )}
+                >
+                  <span className={cn(isChildActive ? 'text-jf-primary' : 'text-jf-text-muted')}>
+                    {item.icon}
+                  </span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  <svg
+                    className={cn('w-4 h-4 transition-transform text-jf-text-muted', settingsOpen && 'rotate-180')}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                <div className={cn('mt-0.5 ml-4 pl-3 border-l border-jf-border space-y-0.5', !settingsOpen && 'hidden')}>
+                    {item.children.map((child) => {
+                      const isActive = pathname.startsWith(child.href)
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onNavigate}
+                          className={cn(
+                            'flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                            isActive
+                              ? 'bg-jf-primary-muted text-jf-primary'
+                              : 'text-jf-text-secondary hover:bg-jf-elevated hover:text-jf-text-primary',
+                          )}
+                          aria-current={isActive ? 'page' : undefined}
+                        >
+                          {child.label}
+                        </Link>
+                      )
+                    })}
+                </div>
+              </div>
+            )
+          }
+
           const isActive =
             item.href === '/dashboard'
               ? pathname === '/dashboard'
-              : pathname.startsWith(item.href)
+              : pathname.startsWith(item.href!)
 
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href!}
               onClick={onNavigate}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',

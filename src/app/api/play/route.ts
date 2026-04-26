@@ -11,6 +11,7 @@ import {
 import { checkRateLimit } from '@/lib/rate-limit'
 import { isWithinOperatingHours } from '@/lib/utils'
 import { PLAY_ERROR, WEBHOOK_MAX_WAIT_SECONDS } from '@/lib/constants'
+import { fireNotifications } from '@/lib/notifications'
 
 const playSchema = z.object({
   tagId: z.string().min(1, 'tagId is required'),
@@ -289,11 +290,8 @@ export async function POST(req: Request) {
       data: { lastPlayedAt: new Date() },
     })
     await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, true, null)
-    // Fire TAG_SCANNED webhooks (best-effort, no retry)
-    void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', {
-      ...webhookContext,
-      contentTitle: result.content,
-    })
+    void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', { ...webhookContext, contentTitle: result.content })
+    void fireNotifications(matchedDevice.user.id, { event: 'TAG_SCANNED', deviceName: matchedDevice.name, contentTitle: result.content ?? tagLabel })
     return NextResponse.json({ success: true, content: result.content })
   }
 
@@ -327,18 +325,14 @@ export async function POST(req: Request) {
           data: { lastPlayedAt: new Date() },
         })
         await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, true, null)
-        void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', {
-          ...webhookContext,
-          contentTitle: retry.content,
-        })
+        void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', { ...webhookContext, contentTitle: retry.content })
+        void fireNotifications(matchedDevice.user.id, { event: 'TAG_SCANNED', deviceName: matchedDevice.name, contentTitle: retry.content ?? tagLabel })
         return NextResponse.json({ success: true, content: retry.content })
       }
 
       await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, retry.code)
-      void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', {
-        ...webhookContext,
-        errorCode: retry.code,
-      })
+      void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', { ...webhookContext, errorCode: retry.code })
+      void fireNotifications(matchedDevice.user.id, { event: 'PLAYBACK_FAILED', deviceName: matchedDevice.name, errorCode: retry.code })
       return NextResponse.json(
         { error: retry.message, code: retry.code },
         { status: 503 },
@@ -347,10 +341,8 @@ export async function POST(req: Request) {
   }
 
   await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, result.code)
-  void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', {
-    ...webhookContext,
-    errorCode: result.code,
-  })
+  void fireWebhooks(matchedDevice.user.id, 'PLAYBACK_FAILED', { ...webhookContext, errorCode: result.code })
+  void fireNotifications(matchedDevice.user.id, { event: 'PLAYBACK_FAILED', deviceName: matchedDevice.name, errorCode: result.code })
   return NextResponse.json(
     { error: result.message, code: result.code },
     { status: 503 },
