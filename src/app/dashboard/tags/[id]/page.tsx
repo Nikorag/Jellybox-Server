@@ -20,15 +20,29 @@ export default async function EditTagPage({ params }: { params: Promise<{ id: st
   })
   if (!tag) notFound()
 
-  const server = await db.jellyfinServer.findUnique({
-    where: { userId: accountId },
-    select: { serverUrl: true },
-  })
+  const [server, connectedExtensions] = await Promise.all([
+    db.jellyfinServer.findUnique({
+      where: { userId: accountId },
+      select: { serverUrl: true },
+    }),
+    db.extensionAccount.findMany({
+      where: { userId: accountId },
+      select: { extension: { select: { id: true, name: true } } },
+      orderBy: { extension: { name: 'asc' } },
+    }),
+  ])
+
+  const extensions = connectedExtensions.map((row) => row.extension)
 
   return (
     <div>
       <PageHeader title={tag.label} description={`Tag ID: ${tag.tagId}`} />
-      <TagForm mode="edit" tag={tag} jellyfinServerUrl={server?.serverUrl ?? null} />
+      <TagForm
+        mode="edit"
+        tag={tag}
+        jellyfinServerUrl={server?.serverUrl ?? null}
+        extensions={extensions}
+      />
     </div>
   )
 }

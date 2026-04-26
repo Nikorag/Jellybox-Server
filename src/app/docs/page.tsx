@@ -17,6 +17,18 @@ const guides = [
     time: '~15 min',
   },
   {
+    href: '/docs/extensions',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M14 10V5a2 2 0 00-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2h5m4-4h5a2 2 0 012 2v5a2 2 0 01-2 2h-5a2 2 0 01-2-2v-5a2 2 0 012-2zm-4-4l4 4-4 4" />
+      </svg>
+    ),
+    title: 'Use & build extensions',
+    description: 'Plug in any media source beyond Jellyfin by writing a small HTTP service. Covers the contract, OAuth, and the reference implementation.',
+    time: '~10 min',
+  },
+  {
     href: '/docs/hardware',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

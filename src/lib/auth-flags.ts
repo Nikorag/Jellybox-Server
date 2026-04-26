@@ -43,3 +43,20 @@ export function getAuthProviderFlags(): AuthProviderFlags {
 export function publicPagesDisabled(): boolean {
   return truthy(process.env.DISABLE_PUBLIC_PAGES)
 }
+
+/**
+ * Whether the given email is configured as an extensions admin.
+ * Reads `ADMINS` (comma-separated list of emails). Compares case-insensitively.
+ * Defaults to closed: empty/unset means *no one* is admin.
+ */
+export function isExtensionsAdmin(email: string | null | undefined): boolean {
+  if (!email) return false
+  const raw = process.env.ADMINS
+  if (!raw) return false
+  const normalised = email.trim().toLowerCase()
+  return raw
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(normalised)
+}

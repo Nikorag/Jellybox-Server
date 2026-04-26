@@ -18,6 +18,12 @@ const sections = [
     ],
   },
   {
+    label: 'Extensions',
+    items: [
+      { href: '/docs/extensions', label: 'Using & building extensions' },
+    ],
+  },
+  {
     label: 'Hardware',
     items: [
       { href: '/docs/hardware', label: 'Components & wiring' },

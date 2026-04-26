@@ -5,13 +5,20 @@ import { useRouter } from 'next/navigation'
 import type { RfidTag } from '@prisma/client'
 import { Button, Input, Card, CardContent, Spinner } from '@/components/ui'
 import ContentPicker from './ContentPicker'
+import ExtensionContentPicker from './ExtensionContentPicker'
 import { createTagAction, updateTagAction } from '@/app/dashboard/tags/actions'
 import type { JellyfinItem } from '@/lib/jellyfin'
+import type { MediaItem } from '@/lib/extensions/types'
+
+export type TagFormExtension = { id: string; name: string }
 
 interface TagFormProps {
   mode: 'create' | 'edit'
   tag?: RfidTag
   jellyfinServerUrl?: string | null
+  /// Connected extensions the user can assign content from. Empty when no
+  /// extensions are connected for this account.
+  extensions?: TagFormExtension[]
   devices?: { id: string; name: string }[]
 }
 
@@ -21,21 +28,61 @@ type ScanState =
   | { status: 'captured'; tagId: string }
   | { status: 'expired' }
 
+type Assignment =
+  | { source: 'none' }
+  | { source: 'jellyfin'; item: JellyfinItem }
+  | { source: 'extension'; extensionId: string; item: MediaItem }
+
 const POLL_INTERVAL_MS = 2000
 
-export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: TagFormProps) {
+function initialAssignment(tag?: RfidTag): Assignment {
+  if (tag?.jellyfinItemId) {
+    return {
+      source: 'jellyfin',
+      item: {
+        Id: tag.jellyfinItemId,
+        Name: tag.jellyfinItemTitle ?? '',
+        Type: (tag.jellyfinItemType ?? 'Movie') as JellyfinItem['Type'],
+        ImageTags: tag.jellyfinItemImageTag ? { Primary: tag.jellyfinItemImageTag } : undefined,
+      },
+    }
+  }
+  if (tag?.extensionId && tag.externalItemId) {
+    return {
+      source: 'extension',
+      extensionId: tag.extensionId,
+      item: {
+        id: tag.externalItemId,
+        title: tag.externalItemTitle ?? '',
+        type: tag.externalItemType ?? 'item',
+      },
+    }
+  }
+  return { source: 'none' }
+}
+
+function initialSourceKey(assignment: Assignment, jellyfinUrl: string | null | undefined, extensions: TagFormExtension[]): string {
+  if (assignment.source === 'jellyfin') return 'jellyfin'
+  if (assignment.source === 'extension') return `extension:${assignment.extensionId}`
+  // Default: prefer Jellyfin if linked, else first extension, else nothing.
+  if (jellyfinUrl) return 'jellyfin'
+  if (extensions[0]) return `extension:${extensions[0].id}`
+  return ''
+}
+
+export default function TagForm({
+  mode,
+  tag,
+  jellyfinServerUrl,
+  extensions = [],
+  devices = [],
+}: TagFormProps) {
   const router = useRouter()
   const [label, setLabel] = useState(tag?.label ?? '')
   const [tagId, setTagId] = useState(tag?.tagId ?? '')
-  const [selectedItem, setSelectedItem] = useState<JellyfinItem | null>(
-    tag?.jellyfinItemId
-      ? {
-          Id: tag.jellyfinItemId,
-          Name: tag.jellyfinItemTitle ?? '',
-          Type: 'Movie',
-          ImageTags: tag.jellyfinItemImageTag ? { Primary: tag.jellyfinItemImageTag } : undefined,
-        }
-      : null,
+  const [assignment, setAssignment] = useState<Assignment>(() => initialAssignment(tag))
+  const [sourceKey, setSourceKey] = useState<string>(() =>
+    initialSourceKey(initialAssignment(tag), jellyfinServerUrl, extensions),
   )
   const [resumePlayback, setResumePlayback] = useState(tag?.resumePlayback ?? false)
   const [shuffle, setShuffle] = useState(tag?.shuffle ?? false)
@@ -63,7 +110,6 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
         } else if (data.status === 'expired') {
           setScanState({ status: 'expired' })
         } else {
-          // still pending — check expiry client-side too
           if (new Date() >= scanState.expiresAt) {
             setScanState({ status: 'expired' })
           } else {
@@ -79,7 +125,6 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
     return () => { if (pollRef.current) clearTimeout(pollRef.current) }
   }, [scanState])
 
-  // Cancel scan mode on unmount
   useEffect(() => {
     return () => {
       if (scanState.status === 'scanning') {
@@ -91,7 +136,7 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
   async function startScanMode() {
     const device = devices.find((d) => d.id === selectedDeviceId)
     if (!device) return
-    setScanState({ status: 'idle' }) // reset any previous state
+    setScanState({ status: 'idle' })
     setError(null)
 
     const res = await fetch('/api/scan-mode', {
@@ -101,7 +146,7 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
     })
     const text = await res.text()
     let data: { token?: string; expiresAt?: string; error?: string } = {}
-    try { data = JSON.parse(text) } catch { /* empty body from server crash */ }
+    try { data = JSON.parse(text) } catch { /* server crash */ }
 
     if (!res.ok || !data.token) {
       setError(data.error ?? 'Failed to start scan mode.')
@@ -123,6 +168,15 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
     setScanState({ status: 'idle' })
   }
 
+  function changeSource(next: string) {
+    setSourceKey(next)
+    setAssignment({ source: 'none' })
+  }
+
+  function clearAssignment() {
+    setAssignment({ source: 'none' })
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setIsPending(true)
@@ -131,12 +185,19 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
     const fd = new FormData()
     fd.set('label', label)
     fd.set('tagId', tagId)
-    if (selectedItem) {
-      fd.set('jellyfinItemId', selectedItem.Id)
-      fd.set('jellyfinItemType', selectedItem.Type.toUpperCase())
-      fd.set('jellyfinItemTitle', selectedItem.Name)
-      fd.set('jellyfinItemImageTag', selectedItem.ImageTags?.Primary ?? '')
+
+    if (assignment.source === 'jellyfin') {
+      fd.set('jellyfinItemId', assignment.item.Id)
+      fd.set('jellyfinItemType', assignment.item.Type.toUpperCase())
+      fd.set('jellyfinItemTitle', assignment.item.Name)
+      fd.set('jellyfinItemImageTag', assignment.item.ImageTags?.Primary ?? '')
+    } else if (assignment.source === 'extension') {
+      fd.set('extensionId', assignment.extensionId)
+      fd.set('externalItemId', assignment.item.id)
+      fd.set('externalItemType', assignment.item.type)
+      fd.set('externalItemTitle', assignment.item.title)
     }
+
     fd.set('resumePlayback', String(resumePlayback))
     fd.set('shuffle', String(shuffle))
 
@@ -156,11 +217,19 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
     router.refresh()
   }
 
-  function handleClearContent() {
-    setSelectedItem(null)
-  }
-
-  const selectedDevice = devices.find((d) => d.id === selectedDeviceId)
+  // Derived helpers for rendering
+  const activeExtension =
+    sourceKey.startsWith('extension:')
+      ? extensions.find((e) => `extension:${e.id}` === sourceKey)
+      : undefined
+  const isJellyfinSource = sourceKey === 'jellyfin'
+  const noSourcesAvailable = !jellyfinServerUrl && extensions.length === 0
+  const selectedTitle =
+    assignment.source === 'jellyfin'
+      ? assignment.item.Name
+      : assignment.source === 'extension'
+        ? assignment.item.title
+        : null
 
   return (
     <>
@@ -173,7 +242,7 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Tag ID field + scan mode */}
+            {/* Tag ID + scan mode */}
             <div className="space-y-2">
               <Input
                 label="Tag ID"
@@ -217,7 +286,6 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
                       </div>
                     </>
                   ) : (
-                    /* scanning */
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <Spinner size="sm" />
@@ -225,12 +293,7 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
                           Waiting for scan on <span className="text-jf-text-primary font-medium">{scanState.deviceName}</span>…
                         </span>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={cancelScanMode}
-                      >
+                      <Button type="button" variant="ghost" size="sm" onClick={cancelScanMode}>
                         Cancel
                       </Button>
                     </div>
@@ -250,40 +313,62 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
 
             {/* Content assignment */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-jf-text-secondary">
-                Jellyfin content
-              </label>
-              {selectedItem ? (
-                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-jf-elevated border border-jf-border">
-                  <span className="text-sm text-jf-text-primary truncate">{selectedItem.Name}</span>
-                  <div className="flex gap-1.5">
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setPickerOpen(true)}>
-                      Change
-                    </Button>
-                    <Button type="button" variant="ghost" size="sm" onClick={handleClearContent}>
-                      Clear
-                    </Button>
-                  </div>
-                </div>
+              <label className="text-sm font-medium text-jf-text-secondary">Content</label>
+
+              {noSourcesAvailable ? (
+                <p className="text-xs text-jf-warning">
+                  Link Jellyfin or connect an extension to assign content.
+                </p>
               ) : (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setPickerOpen(true)}
-                  disabled={!jellyfinServerUrl}
-                >
-                  {jellyfinServerUrl ? 'Browse library…' : 'Link Jellyfin first'}
-                </Button>
+                <>
+                  {/* Source picker — only shown when there are choices */}
+                  {(jellyfinServerUrl ? 1 : 0) + extensions.length > 1 && (
+                    <select
+                      value={sourceKey}
+                      onChange={(e) => changeSource(e.target.value)}
+                      className="form-select rounded-lg bg-jf-elevated border-jf-border text-jf-text-primary text-sm focus:border-jf-primary focus:ring-jf-primary/30"
+                    >
+                      {jellyfinServerUrl && <option value="jellyfin">Jellyfin</option>}
+                      {extensions.map((ext) => (
+                        <option key={ext.id} value={`extension:${ext.id}`}>{ext.name}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* Selected item display + browse trigger */}
+                  {selectedTitle ? (
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-jf-elevated border border-jf-border">
+                      <span className="text-sm text-jf-text-primary truncate">{selectedTitle}</span>
+                      <div className="flex gap-1.5">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setPickerOpen(true)}>
+                          Change
+                        </Button>
+                        <Button type="button" variant="ghost" size="sm" onClick={clearAssignment}>
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => setPickerOpen(true)}
+                      disabled={!isJellyfinSource && !activeExtension}
+                    >
+                      {isJellyfinSource ? 'Browse Jellyfin library…' : `Search ${activeExtension?.name ?? '…'}`}
+                    </Button>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Playback options — only shown when content is selected */}
-            {selectedItem && (
+            {/* Playback options — context-aware */}
+            {assignment.source !== 'none' && (
               <div className="space-y-2 pt-1">
                 <p className="text-xs font-medium text-jf-text-secondary">Playback options</p>
                 <div className="rounded-lg border border-jf-border bg-jf-elevated p-3 space-y-3">
-                  {/* Resume — only meaningful for series */}
-                  {selectedItem.Type === 'Series' && (
+                  {/* Resume — Jellyfin Series only */}
+                  {assignment.source === 'jellyfin' && assignment.item.Type === 'Series' && (
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input
                         type="checkbox"
@@ -297,7 +382,6 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
                       </div>
                     </label>
                   )}
-                  {/* Shuffle */}
                   <label className="flex items-start gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -308,9 +392,11 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
                     <div>
                       <p className="text-sm text-jf-text-primary leading-snug">Shuffle</p>
                       <p className="text-xs text-jf-text-muted">
-                        {selectedItem.Type === 'Series'
+                        {assignment.source === 'jellyfin' && assignment.item.Type === 'Series'
                           ? 'Pick a random episode each time.'
-                          : 'Start playback in shuffle mode.'}
+                          : assignment.source === 'extension'
+                            ? 'Forwarded to the extension as a flag.'
+                            : 'Start playback in shuffle mode.'}
                       </p>
                     </div>
                   </label>
@@ -330,12 +416,24 @@ export default function TagForm({ mode, tag, jellyfinServerUrl, devices = [] }: 
         </CardContent>
       </Card>
 
-      {jellyfinServerUrl && (
+      {/* Pickers — only one open at a time, gated on sourceKey */}
+      {jellyfinServerUrl && isJellyfinSource && (
         <ContentPicker
           open={pickerOpen}
           onClose={() => setPickerOpen(false)}
           onSelect={(item) => {
-            setSelectedItem(item)
+            setAssignment({ source: 'jellyfin', item })
+            setPickerOpen(false)
+          }}
+        />
+      )}
+      {activeExtension && (
+        <ExtensionContentPicker
+          open={pickerOpen}
+          extension={activeExtension}
+          onClose={() => setPickerOpen(false)}
+          onSelect={(item) => {
+            setAssignment({ source: 'extension', extensionId: activeExtension.id, item })
             setPickerOpen(false)
           }}
         />

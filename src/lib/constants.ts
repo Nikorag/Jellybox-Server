@@ -24,6 +24,10 @@ export const JELLYFIN_REQUEST_TIMEOUT_MS = 8_000
 /** How many items to fetch per page when browsing the library */
 export const JELLYFIN_LIBRARY_PAGE_SIZE = 50
 
+// ─── Extensions ───────────────────────────────────────────────────────────────
+/** Timeout in ms for HTTP calls to third-party extensions */
+export const EXTENSION_REQUEST_TIMEOUT_MS = 8_000
+
 // ─── Scan Debounce ────────────────────────────────────────────────────────────
 /** Default grace period in seconds between successive plays from the same device */
 export const DEFAULT_DEBOUNCE_SECONDS = 5

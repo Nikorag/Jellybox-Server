@@ -14,7 +14,7 @@ export default async function NewTagPage() {
 
   const accountId = await getActiveAccountId(session.user.id)
 
-  const [server, devices] = await Promise.all([
+  const [server, devices, connectedExtensions] = await Promise.all([
     db.jellyfinServer.findUnique({
       where: { userId: accountId },
       select: { serverUrl: true },
@@ -24,7 +24,14 @@ export default async function NewTagPage() {
       select: { id: true, name: true },
       orderBy: { name: 'asc' },
     }),
+    db.extensionAccount.findMany({
+      where: { userId: accountId },
+      select: { extension: { select: { id: true, name: true } } },
+      orderBy: { extension: { name: 'asc' } },
+    }),
   ])
+
+  const extensions = connectedExtensions.map((row) => row.extension)
 
   return (
     <div>
@@ -35,6 +42,7 @@ export default async function NewTagPage() {
       <TagForm
         mode="create"
         jellyfinServerUrl={server?.serverUrl ?? null}
+        extensions={extensions}
         devices={devices}
       />
     </div>

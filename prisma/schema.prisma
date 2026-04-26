@@ -25,18 +25,20 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  accounts        Account[]
-  sessions        Session[]
-  jellyfinServer  JellyfinServer?
-  jellyfinClients JellyfinClient[]
-  devices         Device[]
-  rfidTags        RfidTag[]
-  activityLogs    ActivityLog[]
+  accounts          Account[]
+  sessions          Session[]
+  jellyfinServer    JellyfinServer?
+  jellyfinClients   JellyfinClient[]
+  addedExtensions   Extension[]        @relation("AddedExtensions")
+  extensionAccounts ExtensionAccount[]
+  devices           Device[]
+  rfidTags          RfidTag[]
+  activityLogs      ActivityLog[]
 
   // Partners: users this account owner has granted access to their data
-  ownedPartners   AccountPartner[] @relation("OwnedPartners")
+  ownedPartners AccountPartner[] @relation("OwnedPartners")
   // Partners: accounts this user has been granted access to
-  partnerAccess   AccountPartner[] @relation("PartnerAccess")
+  partnerAccess AccountPartner[] @relation("PartnerAccess")
 
   // Operating hours (parental controls)
   operatingHoursEnabled  Boolean @default(false)
@@ -108,16 +110,16 @@ enum JellyfinServerStatus {
 }
 
 model JellyfinServer {
-  id         String               @id @default(cuid())
-  userId     String               @unique
-  serverUrl  String
+  id            String               @id @default(cuid())
+  userId        String               @unique
+  serverUrl     String
   /// AES-256-GCM encrypted Jellyfin API token (format: iv:authTag:ciphertext, all hex)
   apiToken      String
   /// AES-256-GCM encrypted JSON object of custom HTTP headers sent with every Jellyfin request
   customHeaders String?
-  serverId   String?
-  serverName String?
-  status     JellyfinServerStatus @default(UNKNOWN)
+  serverId      String?
+  serverName    String?
+  status        JellyfinServerStatus @default(UNKNOWN)
   lastCheckedAt DateTime?
 
   createdAt DateTime @default(now())
@@ -148,19 +150,73 @@ model JellyfinClient {
   @@map("jellyfin_clients")
 }
 
+// ─── Extensions ──────────────────────────────────────────────────────────────
+
+/// System-wide third-party HTTP extension (e.g. Spotify, Plex, YouTube).
+/// Registered once by an admin (gated by the ADMINS env var). Every user can
+/// then connect their own account to it via ExtensionAccount.
+/// Jellybox calls a fixed set of HTTP routes defined in src/lib/extensions/types.ts.
+model Extension {
+  id            String  @id @default(cuid())
+  /// Human-readable name pulled from the extension's manifest at registration time.
+  name          String
+  /// Base URL the extension is served at (no trailing slash). All contract routes are relative to this.
+  baseUrl       String
+  /// AES-256-GCM encrypted shared secret sent as `Authorization: Bearer …` to the extension.
+  /// One secret per extension — authenticates the Jellybox instance, not individual users.
+  secret        String
+  /// JSON snapshot of the manifest fetched at registration. Refreshed on demand from settings UI.
+  manifest      Json
+  enabled       Boolean @default(true)
+  /// Audit only — which admin originally added this extension. Set to null when that user is deleted.
+  addedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addedBy  User?              @relation("AddedExtensions", fields: [addedByUserId], references: [id], onDelete: SetNull)
+  accounts ExtensionAccount[]
+  rfidTags RfidTag[]
+
+  @@map("extensions")
+}
+
+/// A specific user's connection to an extension (e.g. user A's Spotify account).
+/// Jellybox stores only the opaque accountId — credentials live inside the extension.
+model ExtensionAccount {
+  id              String  @id @default(cuid())
+  extensionId     String
+  userId          String
+  /// Opaque identifier returned by the extension's /authenticate/complete endpoint.
+  accountId       String
+  /// Display name shown in the UI ("jamie@spotify").
+  displayName     String
+  /// Opaque client identifier the user picked as the default playback target. Forwarded to /play.
+  defaultClientId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  extension Extension @relation(fields: [extensionId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([extensionId, userId])
+  @@map("extension_accounts")
+}
+
 // ─── Physical Devices ────────────────────────────────────────────────────────
 
 model Device {
-  id               String    @id @default(cuid())
-  userId           String
-  name             String
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
   /// bcrypt hash of the raw API key
-  apiKeyHash       String
+  apiKeyHash      String
   /// First 8 characters of the raw API key — for display only
-  apiKeyPrefix     String
-  defaultClientId  String?
-  lastSeenAt       DateTime?
-  firmwareVersion  String?
+  apiKeyPrefix    String
+  defaultClientId String?
+  lastSeenAt      DateTime?
+  firmwareVersion String?
 
   /// Set when device is in scan-capture mode; links back to a pending registration session
   scanModeToken     String?
@@ -193,11 +249,11 @@ enum JellyfinItemType {
 }
 
 model RfidTag {
-  id    String @id @default(cuid())
+  id     String @id @default(cuid())
   userId String
   /// Raw RFID hardware UID as reported by the device
-  tagId String
-  label String
+  tagId  String
+  label  String
 
   // Jellyfin content assignment (cached at assignment time)
   jellyfinItemId       String?
@@ -205,6 +261,16 @@ model RfidTag {
   jellyfinItemTitle    String?
   /// Jellyfin image tag for constructing artwork URL
   jellyfinItemImageTag String?
+
+  // Extension-backed assignment (mutually exclusive with jellyfin* fields)
+  extensionId         String?
+  /// Opaque item identifier returned by the extension at search/get time.
+  externalItemId      String?
+  /// Free-form item type as reported by the extension (e.g. "track", "album").
+  externalItemType    String?
+  externalItemTitle   String?
+  /// Opaque image identifier — passed back to the extension's /image route via the proxy.
+  externalItemImageId String?
 
   /// For SERIES: play next unplayed episode instead of a random one
   resumePlayback Boolean @default(false)
@@ -215,6 +281,7 @@ model RfidTag {
   updatedAt DateTime @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extension    Extension?    @relation(fields: [extensionId], references: [id], onDelete: SetNull)
   activityLogs ActivityLog[]
 
   // A tag ID must be unique per user
@@ -234,7 +301,7 @@ model AccountPartner {
   partnerId String
   createdAt DateTime @default(now())
 
-  owner   User @relation("OwnedPartners", fields: [ownerId],   references: [id], onDelete: Cascade)
+  owner   User @relation("OwnedPartners", fields: [ownerId], references: [id], onDelete: Cascade)
   partner User @relation("PartnerAccess", fields: [partnerId], references: [id], onDelete: Cascade)
 
   @@unique([ownerId, partnerId])
@@ -269,10 +336,10 @@ model Webhook {
 // ─── Activity Logs ───────────────────────────────────────────────────────────
 
 model ActivityLog {
-  id         String  @id @default(cuid())
-  userId     String
-  deviceId   String?
-  rfidTagId  String?
+  id        String  @id @default(cuid())
+  userId    String
+  deviceId  String?
+  rfidTagId String?
 
   // Snapshots captured at log time (survive deletions)
   deviceName        String
@@ -285,9 +352,9 @@ model ActivityLog {
 
   createdAt DateTime @default(now())
 
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  device  Device?     @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  rfidTag RfidTag?    @relation(fields: [rfidTagId], references: [id], onDelete: SetNull)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device  Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  rfidTag RfidTag? @relation(fields: [rfidTagId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([deviceId, createdAt(sort: Desc)])
