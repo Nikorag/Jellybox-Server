@@ -55,3 +55,6 @@ yarn-error.log*
 .turbo
 TODO.md
 .env*.local
+
+# Reference extension persisted state (contains long-lived provider tokens)
+examples/*/accounts.json

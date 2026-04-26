@@ -14,6 +14,14 @@ const sizeClasses = {
   lg: 'w-12 h-12 text-base',
 }
 
+// Pixel widths matching the Tailwind size classes above. Used as `sizes` on
+// the underlying next/image so it can pick a sensible source.
+const sizePx: Record<NonNullable<AvatarProps['size']>, string> = {
+  sm: '28px',
+  md: '36px',
+  lg: '48px',
+}
+
 export default function Avatar({ name, src, size = 'md', className }: AvatarProps) {
   const initials = getInitials(name)
 
@@ -27,7 +35,13 @@ export default function Avatar({ name, src, size = 'md', className }: AvatarProp
       aria-label={name ?? 'User avatar'}
     >
       {src ? (
-        <Image src={src} alt={name ?? 'Avatar'} fill className="object-cover" />
+        <Image
+          src={src}
+          alt={name ?? 'Avatar'}
+          fill
+          sizes={sizePx[size]}
+          className="object-cover"
+        />
       ) : (
         <span>{initials}</span>
       )}

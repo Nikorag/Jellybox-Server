@@ -263,14 +263,17 @@ model RfidTag {
   jellyfinItemImageTag String?
 
   // Extension-backed assignment (mutually exclusive with jellyfin* fields)
-  extensionId         String?
+  extensionId          String?
   /// Opaque item identifier returned by the extension at search/get time.
-  externalItemId      String?
+  externalItemId       String?
   /// Free-form item type as reported by the extension (e.g. "track", "album").
-  externalItemType    String?
-  externalItemTitle   String?
+  externalItemType     String?
+  externalItemTitle    String?
   /// Opaque image identifier — passed back to the extension's /image route via the proxy.
-  externalItemImageId String?
+  externalItemImageId  String?
+  /// Direct image URL captured from the extension's MediaItem at assignment time.
+  /// When set, the UI uses it as-is instead of falling back to the /image proxy.
+  externalItemImageUrl String?
 
   /// For SERIES: play next unplayed episode instead of a random one
   resumePlayback Boolean @default(false)

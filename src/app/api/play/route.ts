@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { verifySecret, decrypt } from '@/lib/crypto'
-import { jellyfinGetSessions, jellyfinPlay, jellyfinGetRandomEpisode, jellyfinGetNextEpisode, JellyfinApiError } from '@/lib/jellyfin'
-import { ExtensionApiError, play as extensionPlay } from '@/lib/extensions/client'
-import type { Extension } from '@prisma/client'
+import {
+  attemptExtensionPlay,
+  attemptJellyfinPlay,
+  type PlayFailure,
+  type PlaySuccess,
+} from '@/lib/play/dispatch'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { isWithinOperatingHours } from '@/lib/utils'
 import { PLAY_ERROR, WEBHOOK_MAX_WAIT_SECONDS } from '@/lib/constants'
@@ -255,11 +258,7 @@ export async function POST(req: Request) {
       : {}
 
     doPlay = () =>
-      attemptPlay({
-        deviceId: matchedDevice.id,
-        userId: matchedDevice.user.id,
-        deviceName: matchedDevice.name,
-        tagId,
+      attemptJellyfinPlay({
         tag: {
           id: tag.id,
           jellyfinItemId: tag.jellyfinItemId,
@@ -356,139 +355,6 @@ export async function POST(req: Request) {
     { error: result.message, code: result.code },
     { status: 503 },
   )
-}
-
-// ── attemptPlay ───────────────────────────────────────────────────────────────
-
-type PlaySuccess = { type: 'success'; content: string | undefined }
-type PlayFailure = { type: 'failure'; code: string; message: string }
-
-async function attemptPlay({
-  client,
-  server,
-  apiToken,
-  customHeaders,
-  tag,
-}: {
-  deviceId: string
-  userId: string
-  deviceName: string
-  tagId: string
-  tag: {
-    id: string
-    jellyfinItemId: string | null
-    jellyfinItemType: string | null
-    jellyfinItemTitle: string | null
-    resumePlayback: boolean
-    shuffle: boolean
-  }
-  client: { jellyfinDeviceId: string }
-  server: { serverUrl: string }
-  apiToken: string
-  customHeaders: Record<string, string>
-}): Promise<PlaySuccess | PlayFailure> {
-  try {
-    const sessions = await jellyfinGetSessions(server.serverUrl, apiToken, customHeaders)
-
-    const liveSession = sessions.find(
-      (s) => s.DeviceId === client.jellyfinDeviceId && s.SupportsRemoteControl !== false,
-    )
-
-    if (!liveSession) {
-      return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'Playback client is not active.' }
-    }
-
-    let playItemId = tag.jellyfinItemId!
-    let playItemTitle = tag.jellyfinItemTitle ?? undefined
-    // Default play command; overridden to PlayShuffle for shuffle-enabled non-series items
-    let playCommand: 'PlayNow' | 'PlayShuffle' = 'PlayNow'
-
-    if (tag.jellyfinItemType === 'SERIES') {
-      if (tag.resumePlayback && liveSession.UserId) {
-        const episode = await jellyfinGetNextEpisode(
-          server.serverUrl, apiToken, tag.jellyfinItemId!, liveSession.UserId, customHeaders,
-        )
-        if (!episode) {
-          return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'No episodes found for this series.' }
-        }
-        playItemId = episode.Id
-        playItemTitle = episode.Name
-      } else {
-        // Default: random episode (also used as fallback when no UserId available)
-        const episode = await jellyfinGetRandomEpisode(server.serverUrl, apiToken, tag.jellyfinItemId!, customHeaders)
-        if (!episode) {
-          return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'No episodes found for this series.' }
-        }
-        playItemId = episode.Id
-        playItemTitle = episode.Name
-      }
-    } else if (tag.shuffle) {
-      // Albums and playlists: use Jellyfin's native shuffle command
-      playCommand = 'PlayShuffle'
-    }
-
-    await jellyfinPlay(server.serverUrl, apiToken, liveSession.Id, playItemId, customHeaders, playCommand)
-    return { type: 'success', content: playItemTitle }
-  } catch (err) {
-    const code = err instanceof JellyfinApiError && err.isAuthError
-      ? PLAY_ERROR.AUTH_ERROR
-      : PLAY_ERROR.OFFLINE
-    return { type: 'failure', code, message: err instanceof Error ? err.message : 'Jellyfin error.' }
-  }
-}
-
-// ── attemptExtensionPlay ──────────────────────────────────────────────────────
-
-async function attemptExtensionPlay({
-  extension,
-  accountId,
-  clientId,
-  externalItemId,
-  title,
-  flags,
-}: {
-  extension: Extension
-  accountId: string
-  clientId: string | null
-  externalItemId: string
-  title?: string
-  flags: { resumePlayback: boolean; shuffle: boolean }
-}): Promise<PlaySuccess | PlayFailure> {
-  try {
-    const result = await extensionPlay(extension, accountId, externalItemId, clientId, flags)
-    if (result.ok) {
-      return { type: 'success', content: title }
-    }
-    // Extension reported a structured failure — pass through, mapping its codes.
-    return {
-      type: 'failure',
-      code: mapExtensionCode(result.code),
-      message: result.message,
-    }
-  } catch (err) {
-    const code =
-      err instanceof ExtensionApiError && err.isAuthError
-        ? PLAY_ERROR.AUTH_ERROR
-        : PLAY_ERROR.OFFLINE
-    return {
-      type: 'failure',
-      code,
-      message: err instanceof Error ? err.message : 'Extension error.',
-    }
-  }
-}
-
-function mapExtensionCode(code: 'OFFLINE' | 'NO_CLIENT' | 'AUTH_ERROR' | 'UNKNOWN'): string {
-  switch (code) {
-    case 'OFFLINE':
-      return PLAY_ERROR.OFFLINE
-    case 'NO_CLIENT':
-      return PLAY_ERROR.NO_CLIENT
-    case 'AUTH_ERROR':
-      return PLAY_ERROR.AUTH_ERROR
-    default:
-      return PLAY_ERROR.UNKNOWN
-  }
 }
 
 // ── fireWebhooks ──────────────────────────────────────────────────────────────

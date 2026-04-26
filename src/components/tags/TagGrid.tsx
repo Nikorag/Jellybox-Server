@@ -65,8 +65,10 @@ export default function TagGrid({ tags }: { tags: RfidTag[] }) {
         <EmptyState title="No tags match" description="Try adjusting your search or filter." />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {filtered.map((tag) => (
-            <TagCard key={tag.id} tag={tag} />
+          {filtered.map((tag, i) => (
+            // First row's worth (md:grid-cols-4) is above the fold — load eagerly so
+            // the LCP image isn't deferred. Rest stay lazy.
+            <TagCard key={tag.id} tag={tag} priority={i < 4} />
           ))}
         </div>
       )}

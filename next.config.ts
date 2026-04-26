@@ -1,9 +1,22 @@
 import type { NextConfig } from 'next'
 
+// Hosts allowed to fetch dev resources (HMR, client chunks). Set NEXT_DEV_ORIGINS
+// in .env (or .env.local) to a comma-separated list of LAN hostnames/IPs you
+// access dev from. Each entry is also expanded to include common dev ports so
+// Next's match works whether it compares hostname-only or full origin.
+const rawDevOrigins = process.env.NEXT_DEV_ORIGINS
+  ?.split(',')
+  .map((s) => s.trim())
+  .filter(Boolean) ?? []
+const devOrigins = rawDevOrigins.flatMap((host) =>
+  host.includes(':') ? [host] : [host, `${host}:3000`],
+)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('[next.config] allowedDevOrigins:', devOrigins.length ? devOrigins : '(none)')
+}
+
 const nextConfig: NextConfig = {
-  // Hosts allowed to fetch dev resources (HMR, client chunks). Set NEXT_DEV_ORIGINS
-  // to a comma-separated list of LAN hostnames/IPs you access dev from.
-  allowedDevOrigins: process.env.NEXT_DEV_ORIGINS?.split(',').map((s) => s.trim()).filter(Boolean),
+  allowedDevOrigins: devOrigins,
   images: {
     localPatterns: [
       {

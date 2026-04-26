@@ -1,0 +1,10 @@
+{
+  "name": "jellybox-extension-homeassistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Home Assistant Scripts extension for Jellybox — tag a Jellybox tag with an HA script and triggering it on scan.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}

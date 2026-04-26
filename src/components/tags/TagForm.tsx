@@ -55,6 +55,7 @@ function initialAssignment(tag?: RfidTag): Assignment {
         id: tag.externalItemId,
         title: tag.externalItemTitle ?? '',
         type: tag.externalItemType ?? 'item',
+        imageUrl: tag.externalItemImageUrl ?? undefined,
       },
     }
   }
@@ -196,6 +197,9 @@ export default function TagForm({
       fd.set('externalItemId', assignment.item.id)
       fd.set('externalItemType', assignment.item.type)
       fd.set('externalItemTitle', assignment.item.title)
+      if (assignment.item.imageUrl) {
+        fd.set('externalItemImageUrl', assignment.item.imageUrl)
+      }
     }
 
     fd.set('resumePlayback', String(resumePlayback))

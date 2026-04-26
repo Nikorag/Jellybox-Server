@@ -27,10 +27,17 @@ which.
 
 A tag's content can come from Jellyfin (built-in) or from a third-party HTTP **extension** an
 admin has registered. Extensions are out-of-process services (Lambda or Docker sidecar) that
-implement a fixed contract — see `src/lib/extensions/types.ts` and the working starter in
-`examples/extension-reference/`. Admin gating is controlled by the `ADMINS` env var. No
-third-party extensions ship with the project; the framework is the surface. Full contract
-details, OAuth flow, and gotchas are in [AGENTS.md](./AGENTS.md).
+implement a fixed contract — see `src/lib/extensions/types.ts` for the types. Admin gating
+is controlled by the `ADMINS` env var. No third-party extensions ship as part of the framework
+itself; the framework is the surface, and the `examples/` directory ships a couple of working
+implementations to start from:
+
+| Example | What it does |
+|---|---|
+| [`examples/extension-reference/`](./examples/extension-reference/) | Canonical reference. Implements every contract route with canned data. `AUTH_FLOW=oauth` toggles a fake OAuth provider for local testing. The right place to start when writing your own. |
+| [`examples/extension-homeassistant/`](./examples/extension-homeassistant/) | Home Assistant scripts. Tag a Jellybox tag with an HA `script.*` entity and triggering it on scan. Credentials flow with a long-lived token; persists `accountId → token` to a JSON file so restarts don't drop connections. |
+
+Full contract details, OAuth flow, and gotchas are in [AGENTS.md](./AGENTS.md).
 
 ---
 
@@ -171,7 +178,8 @@ jellybox-server/
 │       ├── utils.ts           # Utility functions (cn, formatDate…)
 │       └── constants.ts       # App-wide constants
 ├── examples/
-│   └── extension-reference/   # Runnable starter — implements the full contract with canned data
+│   ├── extension-reference/    # Runnable starter — implements the full contract with canned data
+│   └── extension-homeassistant/ # Home Assistant scripts extension (long-lived token, persisted)
 ├── e2e/                       # Playwright tests
 ├── .storybook/                # Storybook config
 └── src/__tests__/             # Jest unit tests
