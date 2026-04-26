@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { href: '/docs', label: 'Overview' },
   { href: '/docs/server', label: 'Deploy' },
+  { href: '/docs/self-hosting', label: 'Self-host' },
   { href: '/docs/extensions', label: 'Extensions' },
   { href: '/docs/hardware', label: 'Hardware' },
   { href: '/docs/firmware', label: 'Firmware' },

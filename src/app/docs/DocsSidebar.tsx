@@ -15,6 +15,7 @@ const sections = [
     label: 'Server',
     items: [
       { href: '/docs/server', label: 'Deploy to Vercel' },
+      { href: '/docs/self-hosting', label: 'Self-host with Docker' },
     ],
   },
   {

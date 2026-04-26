@@ -255,6 +255,32 @@ All variables listed in `.env.example` are required. For production:
 
 ---
 
+## Self-hosting with Docker
+
+Prefer to run everything on your own hardware? The repo ships a `Dockerfile` and a
+`docker-compose.yml` that bring up Postgres + the Jellybox web app together. No Vercel, no
+Neon, no Resend (unless you want email sign-up).
+
+```bash
+git clone https://github.com/Nikorag/Jellybox-Server.git
+cd Jellybox-Server
+cp .env.docker.example .env
+# Generate AUTH_SECRET:           openssl rand -base64 32
+# Generate JELLYFIN_ENCRYPTION_KEY: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+# Fill them into .env, then:
+docker compose up -d --build
+```
+
+The Jellybox container runs `prisma migrate deploy` automatically on startup. Open
+[http://localhost:3000](http://localhost:3000) to create your first account.
+
+The compose file also includes a (commented-out) sidecar for the Home Assistant scripts
+extension — uncomment it to plug HA scripts in as Jellybox tag content. Full walkthrough
+including reverse-proxy setup, sidecars, and backups is in
+**[/docs/self-hosting](https://jellybox.nikorag.co.uk/docs/self-hosting)**.
+
+---
+
 ## Contributing
 
 1. Create a branch: `git checkout -b feat/your-feature`

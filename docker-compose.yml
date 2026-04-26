@@ -1,0 +1,70 @@
+# Self-hosting stack for Jellybox.
+#
+# Brings up:
+#   - postgres   — local PostgreSQL with a named volume for persistence
+#   - jellybox   — the Next.js app, built from the Dockerfile in this repo
+#
+# An optional Home Assistant scripts extension is included (commented out).
+# Uncomment + fill in to expose HA scripts as Jellybox tag content.
+#
+# Quick start:
+#   1. cp .env.docker.example .env
+#   2. Generate AUTH_SECRET:           openssl rand -base64 32
+#   3. Generate JELLYFIN_ENCRYPTION_KEY: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+#   4. docker compose up -d --build
+#   5. Open http://localhost:3000
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jellybox
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jellybox}
+      POSTGRES_DB: jellybox
+    volumes:
+      - jellybox-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jellybox -d jellybox"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  jellybox:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    env_file: .env
+    # Compose-managed env overrides things in .env that are deployment-specific.
+    # DATABASE_URL/DIRECT_URL point at the postgres service on the compose network.
+    environment:
+      DATABASE_URL: postgres://jellybox:${POSTGRES_PASSWORD:-jellybox}@postgres:5432/jellybox
+      DIRECT_URL: postgres://jellybox:${POSTGRES_PASSWORD:-jellybox}@postgres:5432/jellybox
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_URL: ${AUTH_URL:-http://localhost:3000}
+
+  # Optional: Home Assistant scripts extension running as a sidecar on the same
+  # docker network. Reachable from Jellybox at http://jellybox-ha-extension:4557.
+  # Register that URL at /dashboard/settings/extensions once everything's up.
+  #
+  # jellybox-ha-extension:
+  #   image: node:22-alpine
+  #   restart: unless-stopped
+  #   working_dir: /app
+  #   volumes:
+  #     - ./examples/extension-homeassistant:/app:ro
+  #     - jellybox-ha-accounts:/data
+  #   command: node server.mjs
+  #   environment:
+  #     PORT: 4557
+  #     HOMEASSISTANT_URL: ${HOMEASSISTANT_URL}
+  #     JELLYBOX_BEARER_SECRET: ${JELLYBOX_HA_BEARER_SECRET}
+  #     ACCOUNTS_FILE: /data/accounts.json
+
+volumes:
+  jellybox-postgres:
+  # jellybox-ha-accounts:

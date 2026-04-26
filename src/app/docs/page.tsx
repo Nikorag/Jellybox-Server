@@ -17,6 +17,18 @@ const guides = [
     time: '~15 min',
   },
   {
+    href: '/docs/self-hosting',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M5 12V7a2 2 0 012-2h10a2 2 0 012 2v5M5 12h14M5 12v5a2 2 0 002 2h10a2 2 0 002-2v-5M9 8h.01M9 16h.01" />
+      </svg>
+    ),
+    title: 'Self-host with Docker',
+    description: 'Run the whole stack on your own hardware with the bundled Dockerfile and docker-compose.yml. Bundles Postgres, supports extension sidecars, no cloud account required.',
+    time: '~10 min',
+  },
+  {
     href: '/docs/extensions',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

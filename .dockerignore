@@ -1,0 +1,41 @@
+# Local dev artefacts — never end up in the image.
+node_modules
+.next
+out
+dist
+build
+coverage
+.turbo
+
+# Local environment / secrets.
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# VCS / CI / editor.
+.git
+.gitignore
+.github
+.vscode
+.idea
+*.swp
+
+# Tests / Storybook (not needed in the runtime image).
+e2e
+playwright-report
+test-results
+.storybook
+storybook-static
+
+# Logs / OS noise.
+*.log
+.DS_Store
+
+# TypeScript build info.
+*.tsbuildinfo
+next-env.d.ts
+
+# The reference extensions are kept out of the server image — they're
+# meant to be run as separate containers, see docker-compose.yml.
+examples
