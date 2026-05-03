@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifySecret } from '@/lib/crypto'
+import { getCachedFirmwareManifest } from '@/lib/firmware-manifest'
 
 /**
  * GET /api/device/me
@@ -10,7 +11,7 @@ import { verifySecret } from '@/lib/crypto'
  *
  * Auth: Authorization: Bearer jb_<key>
  *
- * 200 { name, scanMode }
+ * 200 { name, scanMode, latestFirmware? }
  * 401 missing or invalid key — device should show "Unpaired" on eInk
  */
 export async function GET(req: Request) {
@@ -49,8 +50,11 @@ export async function GET(req: Request) {
     !!device.scanModeExpiresAt &&
     device.scanModeExpiresAt > new Date()
 
+  const latestFirmware = getCachedFirmwareManifest()
+
   return NextResponse.json({
     name: device.name,
     scanMode,
+    ...(latestFirmware ? { latestFirmware } : {}),
   })
 }

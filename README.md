@@ -39,6 +39,36 @@ implementations to start from:
 
 Full contract details, OAuth flow, and gotchas are in [AGENTS.md](./AGENTS.md).
 
+### Firmware OTA updates
+
+Paired Jellybox devices (firmware ≥ v0.0.3) check `/api/device/me` every 30 s for a
+`latestFirmware` field. If the advertised version differs from what's flashed, the device
+downloads the new binary, flashes it, and reboots — no user action, no app.
+
+The server is the source of truth for which version to serve. On startup, and every 5
+minutes thereafter, it fetches a release manifest from GitHub and caches it in memory.
+If GitHub is unreachable or returns malformed JSON, the last good manifest keeps serving
+and devices keep working — they just won't see new versions until GitHub recovers. On a
+cold start with no successful fetch yet, the bootstrap response simply omits
+`latestFirmware`, which firmware treats as "no update available".
+
+Two env vars control this:
+
+| Variable           | Default                       | Purpose                                                                                          |
+|--------------------|-------------------------------|--------------------------------------------------------------------------------------------------|
+| `FIRMWARE_REPO`    | `Nikorag/Jellybox-Firmware`   | GitHub `owner/name` of the firmware repo to poll. Override if you maintain your own firmware fork. |
+| `FIRMWARE_VERSION` | `latest`                      | Pin every device to a specific tag (e.g. `v0.0.2`) instead of always serving the newest release. |
+
+The fetched URL is:
+
+- `https://github.com/<FIRMWARE_REPO>/releases/latest/download/manifest.json` when `FIRMWARE_VERSION` is unset or `latest`
+- `https://github.com/<FIRMWARE_REPO>/releases/download/<FIRMWARE_VERSION>/manifest.json` when pinned
+
+If you fork the firmware, your CI must publish a `manifest.json` asset on each release
+with at least `version` (string) and `url` (string) fields — `url` is the binary the
+device will download and flash. See the firmware repo's release workflow for the
+canonical shape.
+
 ---
 
 ## Tech Stack
@@ -109,6 +139,8 @@ cp .env.example .env.local
 | `DISABLE_PUBLIC_PAGES`    | (Optional) Set `true` to hide the landing and docs pages from anonymous users | `false`                              |
 | `ADMINS`                  | (Optional) Comma-separated emails of users allowed to register/remove extensions. Empty/unset = closed | `you@example.com,partner@…`         |
 | `NEXT_DEV_ORIGINS`        | (Dev only) Comma-separated LAN hosts when running `next dev -H 0.0.0.0` so HMR/chunk fetches aren't blocked | `192.168.1.39`                       |
+| `FIRMWARE_REPO`           | (Optional) GitHub `owner/name` of the firmware repo to poll for OTA. Defaults to `Nikorag/Jellybox-Firmware`. Override if you maintain a fork. | `Nikorag/Jellybox-Firmware`          |
+| `FIRMWARE_VERSION`        | (Optional) Pin all devices to a specific firmware tag. Leave unset (or `latest`) to always advertise the newest GitHub release. | `v0.0.2`                             |
 
 ### 3. Database Setup
 
