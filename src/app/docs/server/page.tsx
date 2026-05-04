@@ -238,7 +238,28 @@ export default function ServerPage() {
               description="Google OAuth client secret. Only required if you set up Google sign-in in step 5."
               required={false}
             />
+            <EnvVar
+              name="FIRMWARE_REPO"
+              description="GitHub owner/name of the firmware repo your install polls for OTA. Defaults to Nikorag/Jellybox-Firmware. Override if you maintain your own firmware fork."
+              example="Nikorag/Jellybox-Firmware"
+              required={false}
+            />
+            <EnvVar
+              name="FIRMWARE_VERSION"
+              description="Pin every paired device to a specific firmware tag instead of the latest GitHub release. Leave unset (or `latest`) to always serve the newest release."
+              example="v0.0.2"
+              required={false}
+            />
           </div>
+          <Callout>
+            Background: paired devices poll <Code>/api/device/me</Code> every 30s and update
+            themselves when a newer version is advertised. The server fetches the GitHub
+            release manifest every 5 minutes — see the{' '}
+            <Link href="/docs/firmware" className="text-jf-primary hover:underline">
+              firmware OTA section
+            </Link>{' '}
+            for the end-to-end flow.
+          </Callout>
         </Step>
 
         <Step n={8} title="Run the database migration">

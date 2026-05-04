@@ -181,7 +181,38 @@ $EDITOR .env`}</CodeBlock>
           </p>
         </Step>
 
-        <Step n={7} title="Backups">
+        <Step n={7} title="Firmware OTA (optional)">
+          <p>
+            By default your install advertises the latest GitHub release of the upstream firmware
+            repo (<Code>Nikorag/Jellybox-Firmware</Code>) to every paired device. Devices fetch
+            the manifest via <Code>/api/device/me</Code> every 30 seconds and self-update when a
+            newer version is available — see the{' '}
+            <Link href="/docs/firmware" className="text-jf-primary hover:underline">
+              firmware OTA section
+            </Link>{' '}
+            for the full flow. The behaviour is configurable through two env vars in your{' '}
+            <Code>.env</Code>:
+          </p>
+          <CodeBlock>{`# Track a different firmware repo (e.g. your own fork).
+FIRMWARE_REPO=your-github-username/Jellybox-Firmware
+
+# Pin every device to a specific release tag instead of the latest.
+# Leave unset (or "latest") to always serve the newest release.
+FIRMWARE_VERSION=v0.0.2`}</CodeBlock>
+          <p>
+            Both are optional. After changing either, restart the Jellybox container so the
+            background fetcher picks up the new URL:
+          </p>
+          <CodeBlock>{`docker compose up -d`}</CodeBlock>
+          <Callout>
+            If you fork the firmware, your CI must publish a <Code>manifest.json</Code> asset on
+            each release with at least <Code>version</Code> (string) and <Code>url</Code> (string)
+            fields — <Code>url</Code> is the binary the device downloads. The upstream firmware
+            repo&apos;s release workflow is the canonical reference.
+          </Callout>
+        </Step>
+
+        <Step n={8} title="Backups">
           <p>
             All persistent state lives in the <Code>jellybox-postgres</Code> named
             volume. Snapshot it with:

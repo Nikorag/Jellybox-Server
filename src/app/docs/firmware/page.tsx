@@ -237,6 +237,58 @@ export default function FirmwarePage() {
         <p>The device will clear its NVS storage and restart into setup mode.</p>
       </Step>
 
+      {/* OTA updates */}
+      <section className="mt-4 mb-10">
+        <h2 className="text-lg font-semibold text-jf-text-primary mb-3">Over-the-air updates</h2>
+        <div className="space-y-3 text-sm text-jf-text-secondary leading-relaxed">
+          <p>
+            Once a Jellybox is paired, it updates itself. Every 30 seconds the device polls{' '}
+            <Code>/api/device/me</Code> on your server, which returns the latest firmware version
+            advertised by your install. If that version is newer than what&apos;s flashed, the
+            device downloads the binary, writes it to its second OTA partition, and reboots into
+            the new firmware. No phone, no app, no USB cable.
+          </p>
+          <p>
+            While the new image is being written the eInk display shows{' '}
+            <strong className="text-jf-text-primary">Updating firmware…</strong> and the LED ring
+            spins cyan. After the reboot, the device verifies the new image boots cleanly before
+            committing it — if the new firmware crashes during startup, ESP32&apos;s rollback
+            mechanism reverts to the previous version on the next power cycle. A bad release
+            can&apos;t brick a device in the field.
+          </p>
+          <p>
+            The server is the source of truth. It fetches a release manifest from GitHub on a
+            5-minute interval and caches it in memory; if GitHub is unreachable, the last known
+            good manifest keeps serving and devices keep working. Builds tagged{' '}
+            <Code>dev</Code> (e.g. local Arduino IDE flashes) opt out of OTA — only proper release
+            builds will auto-update, so you can keep an in-development device connected without it
+            jumping back to the public release.
+          </p>
+          <p>
+            By default your server tracks the upstream firmware repo and serves whatever release
+            is currently tagged <em>latest</em>. Two env vars override that:{' '}
+            <Code>FIRMWARE_REPO</Code> points at a different GitHub <Code>owner/name</Code> (use
+            this if you maintain your own firmware fork), and <Code>FIRMWARE_VERSION</Code> pins
+            every device to a specific tag like <Code>v0.0.2</Code> instead of always serving the
+            newest release. See the{' '}
+            <Link href="/docs/server" className="text-jf-primary hover:underline">
+              Vercel
+            </Link>{' '}
+            and{' '}
+            <Link href="/docs/self-hosting" className="text-jf-primary hover:underline">
+              self-hosting
+            </Link>{' '}
+            guides for where to set them.
+          </p>
+          <Callout variant="warn">
+            Factory reset only clears WiFi and pairing — it does <strong>not</strong> roll firmware
+            back. To downgrade a device, set <Code>FIRMWARE_VERSION</Code> on the server to the
+            older tag and wait for the next bootstrap; the device will treat the older version as
+            &ldquo;different&rdquo; and reflash to it.
+          </Callout>
+        </div>
+      </section>
+
       {/* LED reference */}
       <section className="mt-4 mb-8">
         <h2 className="text-lg font-semibold text-jf-text-primary mb-3">LED state reference</h2>
