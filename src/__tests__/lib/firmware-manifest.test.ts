@@ -65,13 +65,50 @@ describe('refreshFirmwareManifest', () => {
     )
   })
 
-  it('strips informational fields and only caches version + url', async () => {
+  it('passes chipFamily and mergedUrl through when the upstream manifest provides them', async () => {
+    mockFetchOnce(() =>
+      jsonResponse({
+        version: 'v3.0.0',
+        url: 'https://example.com/jellybox-firmware-v3.0.0.bin',
+        chipFamily: 'ESP32',
+        mergedUrl: 'https://example.com/jellybox-firmware-v3.0.0-merged.bin',
+      }),
+    )
+
+    const result = await refreshFirmwareManifest()
+    expect(result).toEqual({
+      version: 'v3.0.0',
+      url: 'https://example.com/jellybox-firmware-v3.0.0.bin',
+      chipFamily: 'ESP32',
+      mergedUrl: 'https://example.com/jellybox-firmware-v3.0.0-merged.bin',
+    })
+  })
+
+  it('strips informational fields it does not understand', async () => {
     mockFetchOnce(() =>
       jsonResponse({
         version: 'v1.2.3',
         url: 'https://example.com/fw.bin',
         sha256: 'deadbeef',
         size: 999,
+        released_at: '2026-05-03T20:00:00Z',
+      }),
+    )
+
+    await refreshFirmwareManifest()
+    expect(getCachedFirmwareManifest()).toEqual({
+      version: 'v1.2.3',
+      url: 'https://example.com/fw.bin',
+    })
+  })
+
+  it('ignores chipFamily and mergedUrl when they are not strings', async () => {
+    mockFetchOnce(() =>
+      jsonResponse({
+        version: 'v1.2.3',
+        url: 'https://example.com/fw.bin',
+        chipFamily: 42,
+        mergedUrl: null,
       }),
     )
 

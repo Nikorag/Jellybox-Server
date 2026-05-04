@@ -76,6 +76,8 @@ describe('GET /api/device/me', () => {
     getCachedFirmwareManifest.mockReturnValue({
       version: 'v0.0.2',
       url: 'https://example.com/jellybox-firmware-v0.0.2.bin',
+      chipFamily: 'ESP32',
+      mergedUrl: 'https://example.com/jellybox-firmware-v0.0.2-merged.bin',
     })
 
     const res = await GET(makeRequest('jb_validkey1234567890'))
@@ -89,7 +91,7 @@ describe('GET /api/device/me', () => {
         url: 'https://example.com/jellybox-firmware-v0.0.2.bin',
       },
     })
-    // Make sure no extra manifest fields leak through.
+    // chipFamily and mergedUrl are for the web flasher only — must not reach devices.
     expect(Object.keys(body.latestFirmware)).toEqual(['version', 'url'])
   })
 

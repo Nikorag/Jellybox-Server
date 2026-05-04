@@ -28,6 +28,10 @@ export function getFirmwareManifestUrl(): string {
 export type FirmwareManifest = {
   version: string
   url: string
+  /** ESP chip family for browser-based flashing, e.g. "ESP32", "ESP32-S3". */
+  chipFamily?: string
+  /** Self-contained merged binary (offset 0) used by the web flasher. */
+  mergedUrl?: string
 }
 
 let cached: FirmwareManifest | null = null
@@ -54,8 +58,13 @@ export async function refreshFirmwareManifest(): Promise<FirmwareManifest | null
       console.error('[firmware-manifest] malformed manifest, keeping previous cached value')
       return cached
     }
-    const next = data as { version: string; url: string }
-    cached = { version: next.version, url: next.url }
+    const next = data as Record<string, unknown>
+    cached = {
+      version: next.version as string,
+      url: next.url as string,
+      ...(typeof next.chipFamily === 'string' ? { chipFamily: next.chipFamily } : {}),
+      ...(typeof next.mergedUrl === 'string' ? { mergedUrl: next.mergedUrl } : {}),
+    }
     return cached
   } catch (err) {
     console.error('[firmware-manifest] fetch error:', err)

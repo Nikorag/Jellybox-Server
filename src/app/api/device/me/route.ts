@@ -50,7 +50,11 @@ export async function GET(req: Request) {
     !!device.scanModeExpiresAt &&
     device.scanModeExpiresAt > new Date()
 
-  const latestFirmware = getCachedFirmwareManifest()
+  const cachedFirmware = getCachedFirmwareManifest()
+  // Devices only need version + url; chipFamily/mergedUrl are for the web flasher.
+  const latestFirmware = cachedFirmware
+    ? { version: cachedFirmware.version, url: cachedFirmware.url }
+    : null
 
   return NextResponse.json({
     name: device.name,

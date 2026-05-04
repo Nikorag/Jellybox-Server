@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import WebFlasher from './WebFlasher'
 
 export const metadata: Metadata = { title: 'Flash the Firmware — Jellybox Docs' }
 
@@ -80,10 +81,34 @@ export default function FirmwarePage() {
         </Link>
         <h1 className="text-3xl font-bold text-jf-text-primary mt-3 mb-3">Flash the firmware</h1>
         <p className="text-jf-text-secondary leading-relaxed">
-          The Jellybox firmware is an Arduino sketch for the ESP32. This guide walks through installing
-          the toolchain, flashing the firmware, and running through the first-time setup on the device.
+          The Jellybox firmware is an Arduino sketch for the ESP32. The fastest way to get a stock
+          Jellybox running is the in-browser flasher below — no toolchain required. If you&apos;d
+          rather build from source, follow the Arduino IDE steps further down.
         </p>
       </div>
+
+      {/* Web flasher */}
+      <section className="mb-10 rounded-xl border border-jf-border bg-jf-elevated p-5">
+        <h2 className="text-lg font-semibold text-jf-text-primary mb-2">Flash from your browser</h2>
+        <p className="text-sm text-jf-text-secondary leading-relaxed mb-4">
+          Plug your ESP32 into a USB port, click the button below, and pick the serial port for your
+          device. The latest released firmware will be downloaded and flashed in one step. After the
+          flash completes, head to <em>step 7 — first-time setup</em> below.
+        </p>
+        <WebFlasher />
+        <p className="text-xs text-jf-text-muted mt-4 leading-relaxed">
+          Requires a Chromium-based browser (Chrome, Edge, Opera, Arc) on desktop. Firefox and
+          Safari don&apos;t implement Web Serial. If the button stays disabled, check that you&apos;re
+          on HTTPS (or localhost) and that no other process — Arduino IDE, screen, esptool — is
+          holding the serial port open.
+        </p>
+      </section>
+
+      <h2 className="text-lg font-semibold text-jf-text-primary mb-2">Build from source</h2>
+      <p className="text-sm text-jf-text-secondary leading-relaxed mb-6">
+        Use this path if you want to modify the firmware, debug over serial, or pin a development
+        build that opts out of OTA updates.
+      </p>
 
       <Step n={1} title="Install Arduino IDE 2">
         <p>
