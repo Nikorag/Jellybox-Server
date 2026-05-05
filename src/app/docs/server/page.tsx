@@ -252,9 +252,10 @@ export default function ServerPage() {
             />
           </div>
           <Callout>
-            Background: paired devices poll <Code>/api/device/me</Code> every 30s and update
-            themselves when a newer version is advertised. The server fetches the GitHub
-            release manifest every 5 minutes — see the{' '}
+            Background: paired devices poll <Code>/api/device/me</Code> every 30s and report
+            their running firmware version. Updates are triggered by hand from the device page
+            in the dashboard; the server fetches the GitHub release manifest every 5 minutes
+            so it knows what the latest version is. See the{' '}
             <Link href="/docs/firmware" className="text-jf-primary hover:underline">
               firmware OTA section
             </Link>{' '}

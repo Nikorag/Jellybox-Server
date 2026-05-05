@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { getActiveAccountId } from '@/lib/context'
 import { PageHeader } from '@/components/ui'
 import DeviceDetail from '@/components/devices/DeviceDetail'
+import { getFirmwareManifest } from '@/lib/firmware-manifest'
 
 export const metadata: Metadata = { title: 'Device Settings' }
 
@@ -26,10 +27,17 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
     orderBy: { deviceName: 'asc' },
   })
 
+  const manifest = await getFirmwareManifest()
+  const latestFirmwareVersion = manifest?.version ?? null
+
   return (
     <div>
       <PageHeader title={device.name} description="Device settings and API key management." />
-      <DeviceDetail device={device} clients={clients} />
+      <DeviceDetail
+        device={device}
+        clients={clients}
+        latestFirmwareVersion={latestFirmwareVersion}
+      />
     </div>
   )
 }

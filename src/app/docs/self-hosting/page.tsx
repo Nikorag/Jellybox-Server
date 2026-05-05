@@ -183,10 +183,10 @@ $EDITOR .env`}</CodeBlock>
 
         <Step n={7} title="Firmware OTA (optional)">
           <p>
-            By default your install advertises the latest GitHub release of the upstream firmware
-            repo (<Code>Nikorag/Jellybox-Firmware</Code>) to every paired device. Devices fetch
-            the manifest via <Code>/api/device/me</Code> every 30 seconds and self-update when a
-            newer version is available — see the{' '}
+            By default your install treats the latest GitHub release of the upstream firmware
+            repo (<Code>Nikorag/Jellybox-Firmware</Code>) as the available version. Paired devices
+            poll <Code>/api/device/me</Code> every 30 seconds and report their running version;
+            updates are triggered by hand from the device page in the dashboard — see the{' '}
             <Link href="/docs/firmware" className="text-jf-primary hover:underline">
               firmware OTA section
             </Link>{' '}

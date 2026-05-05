@@ -267,11 +267,20 @@ export default function FirmwarePage() {
         <h2 className="text-lg font-semibold text-jf-text-primary mb-3">Over-the-air updates</h2>
         <div className="space-y-3 text-sm text-jf-text-secondary leading-relaxed">
           <p>
-            Once a Jellybox is paired, it updates itself. Every 30 seconds the device polls{' '}
-            <Code>/api/device/me</Code> on your server, which returns the latest firmware version
-            advertised by your install. If that version is newer than what&apos;s flashed, the
-            device downloads the binary, writes it to its second OTA partition, and reboots into
-            the new firmware. No phone, no app, no USB cable.
+            OTA updates are <strong className="text-jf-text-primary">user-triggered</strong> from
+            the dashboard, not automatic. Every 30 seconds the device polls{' '}
+            <Code>/api/device/me</Code>, sending its currently-running version as a{' '}
+            <Code>?version=</Code> query param. The server records that against the device, and
+            only returns a <Code>latestFirmware</Code> field if you&apos;ve flagged the device for
+            an update. Otherwise the field is omitted and the device keeps running what it&apos;s
+            running.
+          </p>
+          <p>
+            To update a device, open its page in the dashboard. The Firmware card shows the
+            running version and the latest version from GitHub. Click{' '}
+            <strong className="text-jf-text-primary">Update firmware</strong> and on the next poll
+            the device will download the binary, write it to its second OTA partition, and reboot
+            into the new firmware. No phone, no app, no USB cable.
           </p>
           <p>
             While the new image is being written the eInk display shows{' '}
@@ -282,20 +291,19 @@ export default function FirmwarePage() {
             can&apos;t brick a device in the field.
           </p>
           <p>
-            The server is the source of truth. It fetches a release manifest from GitHub on a
-            5-minute interval and caches it in memory; if GitHub is unreachable, the last known
-            good manifest keeps serving and devices keep working. Builds tagged{' '}
-            <Code>dev</Code> (e.g. local Arduino IDE flashes) opt out of OTA — only proper release
-            builds will auto-update, so you can keep an in-development device connected without it
-            jumping back to the public release.
+            Once the device reports back the new version, the server compares it to the manifest
+            and clears the pending flag automatically — the dashboard then shows the device as up
+            to date. Builds tagged <Code>dev</Code> (e.g. local Arduino IDE flashes) opt out of
+            OTA, so you can keep an in-development device connected without it jumping back to the
+            public release.
           </p>
           <p>
-            By default your server tracks the upstream firmware repo and serves whatever release
-            is currently tagged <em>latest</em>. Two env vars override that:{' '}
-            <Code>FIRMWARE_REPO</Code> points at a different GitHub <Code>owner/name</Code> (use
-            this if you maintain your own firmware fork), and <Code>FIRMWARE_VERSION</Code> pins
-            every device to a specific tag like <Code>v0.0.2</Code> instead of always serving the
-            newest release. See the{' '}
+            By default your server tracks the upstream firmware repo and treats whatever release
+            is currently tagged <em>latest</em> as the available version. Two env vars override
+            that: <Code>FIRMWARE_REPO</Code> points at a different GitHub{' '}
+            <Code>owner/name</Code> (use this if you maintain your own firmware fork), and{' '}
+            <Code>FIRMWARE_VERSION</Code> pins every device to a specific tag like{' '}
+            <Code>v0.0.2</Code> instead of always offering the newest release. See the{' '}
             <Link href="/docs/server" className="text-jf-primary hover:underline">
               Vercel
             </Link>{' '}
@@ -308,8 +316,8 @@ export default function FirmwarePage() {
           <Callout variant="warn">
             Factory reset only clears WiFi and pairing — it does <strong>not</strong> roll firmware
             back. To downgrade a device, set <Code>FIRMWARE_VERSION</Code> on the server to the
-            older tag and wait for the next bootstrap; the device will treat the older version as
-            &ldquo;different&rdquo; and reflash to it.
+            older tag, then trigger an update from the dashboard; the device will treat the older
+            version as &ldquo;different&rdquo; and reflash to it.
           </Callout>
         </div>
       </section>

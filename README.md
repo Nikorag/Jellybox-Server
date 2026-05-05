@@ -41,16 +41,32 @@ Full contract details, OAuth flow, and gotchas are in [AGENTS.md](./AGENTS.md).
 
 ### Firmware OTA updates
 
-Paired Jellybox devices (firmware ≥ v0.0.3) check `/api/device/me` every 30 s for a
-`latestFirmware` field. If the advertised version differs from what's flashed, the device
-downloads the new binary, flashes it, and reboots — no user action, no app.
+OTA updates are **user-triggered** from the dashboard, not automatic. This stops devices
+from flashing themselves the moment a new GitHub release lands and gives you control over
+when each Jellybox restarts.
 
-The server is the source of truth for which version to serve. On startup, and every 5
+Paired Jellybox devices (firmware ≥ v0.0.3) check `/api/device/me` every 30 s, sending
+their currently-running version as a `?version=` query param. The server records that
+version against the device. The response only includes a `latestFirmware` field when the
+device has been flagged for an update in the dashboard — otherwise it's omitted and the
+firmware treats that as "no update available".
+
+To update a device:
+
+1. Open the device in the dashboard. The Firmware card shows the running version and the
+   latest available version from GitHub.
+2. If they differ, click **Update firmware**. The device's `firmwareUpdatePending` flag
+   is set.
+3. On its next 30-second check-in, the device receives `latestFirmware`, downloads the
+   binary, writes it to its second OTA partition, and reboots.
+4. After reboot the device reports the new version on its next poll. The server compares
+   it to the manifest version and clears the pending flag automatically.
+
+The server is the source of truth for which version to advertise. On startup, and every 5
 minutes thereafter, it fetches a release manifest from GitHub and caches it in memory.
-If GitHub is unreachable or returns malformed JSON, the last good manifest keeps serving
-and devices keep working — they just won't see new versions until GitHub recovers. On a
-cold start with no successful fetch yet, the bootstrap response simply omits
-`latestFirmware`, which firmware treats as "no update available".
+If GitHub is unreachable or returns malformed JSON, the last good manifest keeps serving;
+on a cold start with no successful fetch yet, no update can be triggered until GitHub
+recovers.
 
 Two env vars control this:
 

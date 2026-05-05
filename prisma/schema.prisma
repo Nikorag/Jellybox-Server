@@ -218,6 +218,10 @@ model Device {
   defaultClientId String?
   lastSeenAt      DateTime?
   firmwareVersion String?
+  /// When true, the next /api/device/me poll returns the latest firmware
+  /// manifest, prompting an OTA. Cleared automatically once the device
+  /// reports running the manifest version.
+  firmwareUpdatePending Boolean @default(false)
 
   /// Set when device is in scan-capture mode; links back to a pending registration session
   scanModeToken     String?

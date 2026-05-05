@@ -39,22 +39,40 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Invalid or revoked API key.' }, { status: 401 })
   }
 
-  // Update last seen
-  await db.device.update({
-    where: { id: device.id },
-    data: { lastSeenAt: new Date() },
-  })
+  const reportedVersion = new URL(req.url).searchParams.get('version')?.trim() || null
 
   const scanMode =
     !!device.scanModeToken &&
     !!device.scanModeExpiresAt &&
     device.scanModeExpiresAt > new Date()
 
-  const firmware = await getFirmwareManifest()
-  // Devices only need version + url; chipFamily/mergedUrl are for the web flasher.
-  const latestFirmware = firmware
-    ? { version: firmware.version, url: firmware.url }
-    : null
+  // If the device is flagged for an OTA, surface the latest manifest. When the
+  // device subsequently reports back the manifest version, treat that as a
+  // successful update and clear the pending flag.
+  let latestFirmware: { version: string; url: string } | null = null
+  let clearPending = false
+
+  if (device.firmwareUpdatePending) {
+    const manifest = await getFirmwareManifest()
+    if (manifest) {
+      if (reportedVersion && reportedVersion === manifest.version) {
+        clearPending = true
+      } else {
+        latestFirmware = { version: manifest.version, url: manifest.url }
+      }
+    }
+  }
+
+  await db.device.update({
+    where: { id: device.id },
+    data: {
+      lastSeenAt: new Date(),
+      ...(reportedVersion && reportedVersion !== device.firmwareVersion
+        ? { firmwareVersion: reportedVersion }
+        : {}),
+      ...(clearPending ? { firmwareUpdatePending: false } : {}),
+    },
+  })
 
   return NextResponse.json({
     name: device.name,

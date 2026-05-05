@@ -3,10 +3,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Device, JellyfinClient } from '@prisma/client'
-import { Card, CardContent, CardHeader, Button, Input, ConfirmDialog } from '@/components/ui'
+import { Card, CardContent, CardHeader, Button, Input, ConfirmDialog, Badge } from '@/components/ui'
 import {
   updateDeviceAction,
   deleteDeviceAction,
+  setFirmwareUpdatePendingAction,
 } from '@/app/dashboard/devices/actions'
 import { formatRelativeTime, formatDate } from '@/lib/utils'
 
@@ -15,9 +16,11 @@ type DeviceWithClient = Device & { defaultClient: JellyfinClient | null }
 export default function DeviceDetail({
   device,
   clients,
+  latestFirmwareVersion,
 }: {
   device: DeviceWithClient
   clients: JellyfinClient[]
+  latestFirmwareVersion: string | null
 }) {
   const router = useRouter()
   const [name, setName] = useState(device.name)
@@ -27,6 +30,19 @@ export default function DeviceDetail({
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const [firmwareBusy, setFirmwareBusy] = useState(false)
+  const updateAvailable =
+    !!latestFirmwareVersion &&
+    !!device.firmwareVersion &&
+    latestFirmwareVersion !== device.firmwareVersion
+
+  async function setUpdatePending(pending: boolean) {
+    setFirmwareBusy(true)
+    await setFirmwareUpdatePendingAction(device.id, pending)
+    setFirmwareBusy(false)
+    router.refresh()
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -109,10 +125,68 @@ export default function DeviceDetail({
               <span className="text-jf-text-primary">v{device.firmwareVersion}</span>
             </div>
           )}
+          {latestFirmwareVersion && (
+            <div className="flex justify-between">
+              <span className="text-jf-text-muted">Latest available</span>
+              <span className="text-jf-text-primary">{latestFirmwareVersion}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-jf-text-muted">Added</span>
             <span className="text-jf-text-primary">{formatDate(device.createdAt)}</span>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Firmware */}
+      <Card>
+        <CardHeader>
+          <h2 className="text-sm font-semibold text-jf-text-primary">Firmware</h2>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {device.firmwareUpdatePending ? (
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge variant="warning">Update pending</Badge>
+                </div>
+                <p className="text-xs text-jf-text-muted">
+                  The device will install {latestFirmwareVersion ?? 'the latest firmware'} on its
+                  next check-in.
+                </p>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={firmwareBusy}
+                onClick={() => setUpdatePending(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : updateAvailable ? (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-jf-text-primary">Update available</p>
+                <p className="text-xs text-jf-text-muted">
+                  {device.firmwareVersion} → {latestFirmwareVersion}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                loading={firmwareBusy}
+                onClick={() => setUpdatePending(true)}
+              >
+                Update firmware
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-jf-text-muted">
+              {device.firmwareVersion
+                ? 'Device is running the latest firmware.'
+                : 'Waiting for the device to report its firmware version.'}
+            </p>
+          )}
         </CardContent>
       </Card>
 

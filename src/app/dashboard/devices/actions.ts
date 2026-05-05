@@ -82,6 +82,25 @@ export async function updateDeviceAction(
   return {}
 }
 
+export async function setFirmwareUpdatePendingAction(
+  deviceId: string,
+  pending: boolean,
+): Promise<{ error?: string }> {
+  const session = await auth()
+  if (!session?.user?.id) return { error: 'Unauthorised' }
+
+  const accountId = await getActiveAccountId(session.user.id)
+
+  await db.device.updateMany({
+    where: { id: deviceId, userId: accountId },
+    data: { firmwareUpdatePending: pending },
+  })
+
+  revalidatePath('/dashboard/devices')
+  revalidatePath(`/dashboard/devices/${deviceId}`)
+  return {}
+}
+
 export async function deleteDeviceAction(
   deviceId: string,
 ): Promise<{ error?: string }> {
