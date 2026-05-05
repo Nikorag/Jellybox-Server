@@ -191,7 +191,7 @@ function StepPowerOn({
               2
             </span>
             <span>
-              Wait for the LED ring to breathe{' '}
+              Wait for the LED ring to glow solid{' '}
               <span className="text-amber-400 font-medium">amber</span> — setup mode is active.
             </span>
           </li>
