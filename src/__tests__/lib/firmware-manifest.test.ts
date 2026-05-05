@@ -1,12 +1,7 @@
 /**
  * @jest-environment node
  */
-import {
-  __resetFirmwareManifestForTests,
-  getCachedFirmwareManifest,
-  getFirmwareManifestUrl,
-  refreshFirmwareManifest,
-} from '@/lib/firmware-manifest'
+import { fetchFirmwareManifest, getFirmwareManifestUrl } from '@/lib/firmware-manifest'
 
 const originalFetch = global.fetch
 const originalConsoleError = console.error
@@ -25,7 +20,6 @@ function jsonResponse(body: unknown, init: { status?: number } = {}) {
 }
 
 beforeEach(() => {
-  __resetFirmwareManifestForTests()
   global.fetch = jest.fn() as unknown as typeof fetch
   console.error = jest.fn()
   delete process.env.FIRMWARE_REPO
@@ -41,8 +35,8 @@ afterAll(() => {
   else process.env.FIRMWARE_VERSION = originalVersion
 })
 
-describe('refreshFirmwareManifest', () => {
-  it('populates the cache from a valid manifest', async () => {
+describe('fetchFirmwareManifest', () => {
+  it('returns a parsed manifest from a valid response', async () => {
     mockFetchOnce(() =>
       jsonResponse({
         version: 'v0.0.2',
@@ -53,19 +47,18 @@ describe('refreshFirmwareManifest', () => {
       }),
     )
 
-    const result = await refreshFirmwareManifest()
+    const result = await fetchFirmwareManifest()
     expect(result).toEqual({
       version: 'v0.0.2',
       url: 'https://example.com/firmware-v0.0.2.bin',
     })
-    expect(getCachedFirmwareManifest()).toEqual(result)
     expect(global.fetch).toHaveBeenCalledWith(
       'https://github.com/Nikorag/Jellybox-Firmware/releases/latest/download/manifest.json',
       expect.any(Object),
     )
   })
 
-  it('passes chipFamily and mergedUrl through when the upstream manifest provides them', async () => {
+  it('passes chipFamily and mergedUrl through when present', async () => {
     mockFetchOnce(() =>
       jsonResponse({
         version: 'v3.0.0',
@@ -75,8 +68,7 @@ describe('refreshFirmwareManifest', () => {
       }),
     )
 
-    const result = await refreshFirmwareManifest()
-    expect(result).toEqual({
+    expect(await fetchFirmwareManifest()).toEqual({
       version: 'v3.0.0',
       url: 'https://example.com/jellybox-firmware-v3.0.0.bin',
       chipFamily: 'ESP32',
@@ -95,8 +87,7 @@ describe('refreshFirmwareManifest', () => {
       }),
     )
 
-    await refreshFirmwareManifest()
-    expect(getCachedFirmwareManifest()).toEqual({
+    expect(await fetchFirmwareManifest()).toEqual({
       version: 'v1.2.3',
       url: 'https://example.com/fw.bin',
     })
@@ -112,66 +103,30 @@ describe('refreshFirmwareManifest', () => {
       }),
     )
 
-    await refreshFirmwareManifest()
-    expect(getCachedFirmwareManifest()).toEqual({
+    expect(await fetchFirmwareManifest()).toEqual({
       version: 'v1.2.3',
       url: 'https://example.com/fw.bin',
     })
   })
 
-  it('keeps the previous cached manifest when fetch throws', async () => {
-    mockFetchOnce(() => jsonResponse({ version: 'v0.0.1', url: 'https://example.com/a.bin' }))
-    await refreshFirmwareManifest()
-    expect(getCachedFirmwareManifest()).toEqual({
-      version: 'v0.0.1',
-      url: 'https://example.com/a.bin',
-    })
-
-    mockFetchOnce(() => Promise.reject(new Error('network down')))
-    const result = await refreshFirmwareManifest()
-    expect(result).toEqual({ version: 'v0.0.1', url: 'https://example.com/a.bin' })
-    expect(getCachedFirmwareManifest()).toEqual({
-      version: 'v0.0.1',
-      url: 'https://example.com/a.bin',
-    })
-  })
-
-  it('keeps the previous cached manifest on non-2xx responses', async () => {
-    mockFetchOnce(() => jsonResponse({ version: 'v0.0.1', url: 'https://example.com/a.bin' }))
-    await refreshFirmwareManifest()
-
+  it('returns null on non-2xx responses', async () => {
     mockFetchOnce(() => new Response('Not Found', { status: 404 }))
-    await refreshFirmwareManifest()
-    expect(getCachedFirmwareManifest()).toEqual({
-      version: 'v0.0.1',
-      url: 'https://example.com/a.bin',
-    })
+    expect(await fetchFirmwareManifest()).toBeNull()
   })
 
-  it('does not poison the cache when JSON is malformed', async () => {
-    mockFetchOnce(() => jsonResponse({ version: 'v0.0.1', url: 'https://example.com/a.bin' }))
-    await refreshFirmwareManifest()
-
+  it('returns null on malformed JSON', async () => {
     mockFetchOnce(() => new Response('not json', { status: 200 }))
-    await refreshFirmwareManifest()
-    expect(getCachedFirmwareManifest()).toEqual({
-      version: 'v0.0.1',
-      url: 'https://example.com/a.bin',
-    })
+    expect(await fetchFirmwareManifest()).toBeNull()
   })
 
-  it('rejects manifests missing required fields', async () => {
+  it('returns null when required fields are missing', async () => {
     mockFetchOnce(() => jsonResponse({ url: 'https://example.com/a.bin' }))
-    const result = await refreshFirmwareManifest()
-    expect(result).toBeNull()
-    expect(getCachedFirmwareManifest()).toBeNull()
+    expect(await fetchFirmwareManifest()).toBeNull()
   })
 
-  it('returns null on cold start when fetch fails before any success', async () => {
+  it('returns null when fetch throws', async () => {
     mockFetchOnce(() => Promise.reject(new Error('boom')))
-    const result = await refreshFirmwareManifest()
-    expect(result).toBeNull()
-    expect(getCachedFirmwareManifest()).toBeNull()
+    expect(await fetchFirmwareManifest()).toBeNull()
   })
 })
 

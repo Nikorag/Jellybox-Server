@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import {
-  getCachedFirmwareManifest,
-  getFirmwareManifestUrl,
-  refreshFirmwareManifest,
-} from '@/lib/firmware-manifest'
+import { getFirmwareManifest, getFirmwareManifestUrl } from '@/lib/firmware-manifest'
 
 /**
  * GET /api/firmware/manifest
@@ -12,12 +8,9 @@ import {
  * advertising to devices via /api/device/me, plus the upstream source URL.
  */
 export async function GET() {
-  let cached = getCachedFirmwareManifest()
-  if (!cached) {
-    cached = await refreshFirmwareManifest()
-  }
+  const manifest = await getFirmwareManifest()
   return NextResponse.json({
     source: getFirmwareManifestUrl(),
-    manifest: cached,
+    manifest,
   })
 }

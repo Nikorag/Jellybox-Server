@@ -1,20 +1,19 @@
 /**
- * In-memory cache of the latest Jellybox firmware manifest.
+ * Latest Jellybox firmware manifest.
  *
  * The firmware (>=v0.0.3) polls /api/device/me every 30s and looks for an
  * optional `latestFirmware` object. To avoid each device hammering GitHub,
- * the server fetches the public release manifest once and refreshes it on
- * a 5-minute interval. The bootstrap route reads the cached value via
- * `getCachedFirmwareManifest()` and only includes it in the response when
- * a manifest has been successfully fetched at least once.
+ * we wrap the upstream fetch in Next's data cache with a 5-minute
+ * revalidation window — shared across serverless invocations.
  *
  * Source repo and pinned version are configurable:
  *   FIRMWARE_REPO      — default "Nikorag/Jellybox-Firmware"
  *   FIRMWARE_VERSION   — default "latest" (or a tag like "v0.0.2" to pin)
  */
+import { unstable_cache } from 'next/cache'
 
 export const DEFAULT_FIRMWARE_REPO = 'Nikorag/Jellybox-Firmware'
-export const FIRMWARE_MANIFEST_REFRESH_MS = 5 * 60 * 1000
+export const FIRMWARE_MANIFEST_REVALIDATE_SECONDS = 5 * 60
 
 export function getFirmwareManifestUrl(): string {
   const repo = process.env.FIRMWARE_REPO?.trim() || DEFAULT_FIRMWARE_REPO
@@ -34,19 +33,16 @@ export type FirmwareManifest = {
   mergedUrl?: string
 }
 
-let cached: FirmwareManifest | null = null
-let timer: ReturnType<typeof setInterval> | null = null
-
-export function getCachedFirmwareManifest(): FirmwareManifest | null {
-  return cached
-}
-
-export async function refreshFirmwareManifest(): Promise<FirmwareManifest | null> {
+/**
+ * Uncached fetch + parse. Exported for tests; routes should call
+ * `getFirmwareManifest()` so requests are deduplicated via the data cache.
+ */
+export async function fetchFirmwareManifest(): Promise<FirmwareManifest | null> {
   try {
     const res = await fetch(getFirmwareManifestUrl(), { cache: 'no-store' })
     if (!res.ok) {
       console.error(`[firmware-manifest] fetch failed: HTTP ${res.status}`)
-      return cached
+      return null
     }
     const data: unknown = await res.json()
     if (
@@ -55,39 +51,37 @@ export async function refreshFirmwareManifest(): Promise<FirmwareManifest | null
       typeof (data as Record<string, unknown>).version !== 'string' ||
       typeof (data as Record<string, unknown>).url !== 'string'
     ) {
-      console.error('[firmware-manifest] malformed manifest, keeping previous cached value')
-      return cached
+      console.error('[firmware-manifest] malformed manifest')
+      return null
     }
     const next = data as Record<string, unknown>
-    cached = {
+    return {
       version: next.version as string,
       url: next.url as string,
       ...(typeof next.chipFamily === 'string' ? { chipFamily: next.chipFamily } : {}),
       ...(typeof next.mergedUrl === 'string' ? { mergedUrl: next.mergedUrl } : {}),
     }
-    return cached
   } catch (err) {
     console.error('[firmware-manifest] fetch error:', err)
-    return cached
+    return null
   }
 }
 
-export function startFirmwareManifestPolling(): void {
-  if (timer) return
-  void refreshFirmwareManifest()
-  timer = setInterval(() => {
-    void refreshFirmwareManifest()
-  }, FIRMWARE_MANIFEST_REFRESH_MS)
-  if (typeof (timer as { unref?: () => void }).unref === 'function') {
-    ;(timer as unknown as { unref: () => void }).unref()
-  }
-}
+// Throws on null so unstable_cache does not cache failures.
+const cachedFetch = unstable_cache(
+  async () => {
+    const result = await fetchFirmwareManifest()
+    if (!result) throw new Error('[firmware-manifest] unavailable')
+    return result
+  },
+  ['firmware-manifest'],
+  { revalidate: FIRMWARE_MANIFEST_REVALIDATE_SECONDS },
+)
 
-/** Test-only: clear cache and stop the interval. */
-export function __resetFirmwareManifestForTests(): void {
-  cached = null
-  if (timer) {
-    clearInterval(timer)
-    timer = null
+export async function getFirmwareManifest(): Promise<FirmwareManifest | null> {
+  try {
+    return await cachedFetch()
+  } catch {
+    return null
   }
 }

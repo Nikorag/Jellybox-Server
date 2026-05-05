@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifySecret } from '@/lib/crypto'
-import { getCachedFirmwareManifest } from '@/lib/firmware-manifest'
+import { getFirmwareManifest } from '@/lib/firmware-manifest'
 
 /**
  * GET /api/device/me
@@ -50,10 +50,10 @@ export async function GET(req: Request) {
     !!device.scanModeExpiresAt &&
     device.scanModeExpiresAt > new Date()
 
-  const cachedFirmware = getCachedFirmwareManifest()
+  const firmware = await getFirmwareManifest()
   // Devices only need version + url; chipFamily/mergedUrl are for the web flasher.
-  const latestFirmware = cachedFirmware
-    ? { version: cachedFirmware.version, url: cachedFirmware.url }
+  const latestFirmware = firmware
+    ? { version: firmware.version, url: firmware.url }
     : null
 
   return NextResponse.json({

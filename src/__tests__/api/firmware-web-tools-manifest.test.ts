@@ -4,10 +4,10 @@
 import { GET } from '@/app/api/firmware/web-tools-manifest.json/route'
 
 jest.mock('@/lib/firmware-manifest', () => ({
-  getCachedFirmwareManifest: jest.fn(),
+  getFirmwareManifest: jest.fn(),
 }))
 
-const { getCachedFirmwareManifest } = jest.requireMock('@/lib/firmware-manifest')
+const { getFirmwareManifest } = jest.requireMock('@/lib/firmware-manifest')
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -15,13 +15,13 @@ beforeEach(() => {
 
 describe('GET /api/firmware/web-tools-manifest.json', () => {
   it('returns 503 when no manifest is cached', async () => {
-    getCachedFirmwareManifest.mockReturnValue(null)
+    getFirmwareManifest.mockResolvedValue(null)
     const res = await GET()
     expect(res.status).toBe(503)
   })
 
   it('returns 503 when chipFamily is missing', async () => {
-    getCachedFirmwareManifest.mockReturnValue({
+    getFirmwareManifest.mockResolvedValue({
       version: 'v3.0.0',
       url: 'https://example.com/fw.bin',
       mergedUrl: 'https://example.com/fw-merged.bin',
@@ -31,7 +31,7 @@ describe('GET /api/firmware/web-tools-manifest.json', () => {
   })
 
   it('returns 503 when mergedUrl is missing', async () => {
-    getCachedFirmwareManifest.mockReturnValue({
+    getFirmwareManifest.mockResolvedValue({
       version: 'v3.0.0',
       url: 'https://example.com/fw.bin',
       chipFamily: 'ESP32',
@@ -41,7 +41,7 @@ describe('GET /api/firmware/web-tools-manifest.json', () => {
   })
 
   it('emits an ESP Web Tools manifest when chipFamily and mergedUrl are present', async () => {
-    getCachedFirmwareManifest.mockReturnValue({
+    getFirmwareManifest.mockResolvedValue({
       version: 'v3.0.0',
       url: 'https://example.com/jellybox-firmware-v3.0.0.bin',
       chipFamily: 'ESP32',

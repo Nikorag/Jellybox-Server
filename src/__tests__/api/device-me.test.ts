@@ -17,12 +17,12 @@ jest.mock('@/lib/crypto', () => ({
 }))
 
 jest.mock('@/lib/firmware-manifest', () => ({
-  getCachedFirmwareManifest: jest.fn(),
+  getFirmwareManifest: jest.fn(),
 }))
 
 const { db } = jest.requireMock('@/lib/db')
 const { verifySecret } = jest.requireMock('@/lib/crypto')
-const { getCachedFirmwareManifest } = jest.requireMock('@/lib/firmware-manifest')
+const { getFirmwareManifest } = jest.requireMock('@/lib/firmware-manifest')
 
 const mockDevice = {
   id: 'device-1',
@@ -61,7 +61,7 @@ describe('GET /api/device/me', () => {
   it('omits latestFirmware when the manifest cache is empty', async () => {
     db.device.findMany.mockResolvedValue([mockDevice])
     verifySecret.mockResolvedValue(true)
-    getCachedFirmwareManifest.mockReturnValue(null)
+    getFirmwareManifest.mockResolvedValue(null)
 
     const res = await GET(makeRequest('jb_validkey1234567890'))
     expect(res.status).toBe(200)
@@ -73,7 +73,7 @@ describe('GET /api/device/me', () => {
   it('includes latestFirmware (version + url only) when the manifest is cached', async () => {
     db.device.findMany.mockResolvedValue([mockDevice])
     verifySecret.mockResolvedValue(true)
-    getCachedFirmwareManifest.mockReturnValue({
+    getFirmwareManifest.mockResolvedValue({
       version: 'v0.0.2',
       url: 'https://example.com/jellybox-firmware-v0.0.2.bin',
       chipFamily: 'ESP32',
@@ -104,7 +104,7 @@ describe('GET /api/device/me', () => {
       },
     ])
     verifySecret.mockResolvedValue(true)
-    getCachedFirmwareManifest.mockReturnValue(null)
+    getFirmwareManifest.mockResolvedValue(null)
 
     const res = await GET(makeRequest('jb_validkey1234567890'))
     const body = await res.json()

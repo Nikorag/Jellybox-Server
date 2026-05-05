@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getCachedFirmwareManifest } from '@/lib/firmware-manifest'
+import { getFirmwareManifest } from '@/lib/firmware-manifest'
 
 /**
  * GET /api/firmware/web-tools-manifest.json
@@ -11,7 +11,7 @@ import { getCachedFirmwareManifest } from '@/lib/firmware-manifest'
  * https://esphome.github.io/esp-web-tools/
  */
 export async function GET() {
-  const manifest = getCachedFirmwareManifest()
+  const manifest = await getFirmwareManifest()
 
   if (!manifest || !manifest.chipFamily || !manifest.mergedUrl) {
     return NextResponse.json(
