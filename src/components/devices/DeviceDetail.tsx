@@ -122,7 +122,7 @@ export default function DeviceDetail({
           {device.firmwareVersion && (
             <div className="flex justify-between">
               <span className="text-jf-text-muted">Firmware</span>
-              <span className="text-jf-text-primary">v{device.firmwareVersion}</span>
+              <span className="text-jf-text-primary">{device.firmwareVersion}</span>
             </div>
           )}
           {latestFirmwareVersion && (
