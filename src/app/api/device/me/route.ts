@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifySecret } from '@/lib/crypto'
-import { getFirmwareManifest } from '@/lib/firmware-manifest'
 
 /**
  * GET /api/device/me
@@ -50,11 +49,11 @@ export async function GET(req: Request) {
     !!device.scanModeExpiresAt &&
     device.scanModeExpiresAt > new Date()
 
-  const firmware = await getFirmwareManifest()
-  // Devices only need version + url; chipFamily/mergedUrl are for the web flasher.
-  const latestFirmware = firmware
-    ? { version: firmware.version, url: firmware.url }
-    : null
+  // Temporarily pinned to a static firmware version served from /public.
+  const latestFirmware = {
+    version: "v0.0.9",
+    url: "https://jellybox.nikorag.co.uk/jellybox-firmware-v0.0.9.bin",
+  }
 
   return NextResponse.json({
     name: device.name,
