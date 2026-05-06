@@ -52,7 +52,7 @@ request to the right backend based on the tag's source.
 | Framework        | Next.js 16 (App Router)        | `next.config.ts`                   |
 | Language         | TypeScript                     | `tsconfig.json`                    |
 | Styling          | Tailwind CSS                   | `tailwind.config.ts`, `globals.css`|
-| Auth             | NextAuth v5                    | `src/auth.ts`, `src/middleware.ts` |
+| Auth             | NextAuth v5 — email/password, Google, generic OIDC | `src/auth.ts`, `src/auth.config.ts`, `src/proxy.ts` |
 | ORM              | Prisma                         | `prisma/schema.prisma`, `src/lib/db.ts` |
 | Database         | Neon PostgreSQL                | `DATABASE_URL` env var             |
 | Email            | Resend                         | `src/lib/email.ts`                 |
@@ -74,7 +74,7 @@ jellybox-server/
 │   └── seed.ts                # Dev seed: creates test@example.com / password123
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/            # Route group — no dashboard layout
+│   │   ├── auth/              # Auth flows — sign-in, sign-up, verify, reset
 │   │   │   ├── actions.ts     # Auth server actions (signup, verify, reset password)
 │   │   │   ├── layout.tsx     # Auth shell (logo + footer)
 │   │   │   ├── signin/        # /auth/signin
@@ -82,7 +82,7 @@ jellybox-server/
 │   │   │   ├── verify-email/  # /auth/verify-email
 │   │   │   ├── forgot-password/
 │   │   │   └── reset-password/
-│   │   ├── (dashboard)/       # Route group — requires auth session
+│   │   ├── dashboard/         # Authenticated dashboard — protected by proxy.ts
 │   │   │   ├── layout.tsx     # Dashboard shell (sidebar nav)
 │   │   │   ├── dashboard/     # /dashboard (overview + activity)
 │   │   │   ├── devices/       # /dashboard/devices + /pair + /[id]
@@ -111,8 +111,9 @@ jellybox-server/
 │   │   ├── layout.tsx         # Root layout (fonts, metadata, SessionProvider)
 │   │   ├── page.tsx           # Landing page (public)
 │   │   └── globals.css        # Tailwind base + custom scrollbar
-│   ├── auth.ts                # NextAuth v5: Credentials + Google providers, JWT callbacks
-│   ├── middleware.ts           # Protects /dashboard/** and private /api/** routes
+│   ├── auth.ts                # NextAuth v5 (Node.js): Credentials + Google + OIDC, JWT callbacks
+│   ├── auth.config.ts         # Edge-safe NextAuth config (no Node.js modules) — used by proxy.ts
+│   ├── proxy.ts               # Next.js 16 middleware — protects /dashboard/** and private /api/**
 │   ├── components/
 │   │   ├── ui/                # Primitives — Button, Input, Card, Badge, Modal…
 │   │   ├── auth/              # SignInForm, SignUpForm, VerifyEmailView…
@@ -146,7 +147,8 @@ jellybox-server/
 │   ├── tags.spec.ts
 │   └── play-api.spec.ts
 ├── examples/
-│   └── extension-reference/   # Runnable reference implementation of the extension contract
+│   ├── extension-reference/    # Runnable reference implementation of the extension contract
+│   └── extension-homeassistant/ # Home Assistant scripts extension (long-lived token, persisted)
 └── src/__tests__/
     ├── lib/                   # crypto.test.ts, utils.test.ts, extensions/client.test.ts
     ├── api/                   # health.test.ts, play.test.ts, jellyfin-connect.test.ts
@@ -221,7 +223,7 @@ return { error: 'message' } // error
 
 - Session is a JWT (`session: { strategy: 'jwt' }`).
 - Access `session.user.id` — it's populated in the `jwt` callback and always present for authenticated users.
-- Middleware in `src/middleware.ts` blocks unauthenticated access to `/dashboard/**`.
+- Middleware in `src/proxy.ts` (Next.js 16's renamed middleware file) blocks unauthenticated access to `/dashboard/**`.
 - The `/api/play` endpoint uses its own device API key authentication (not NextAuth).
 
 ---
@@ -332,6 +334,41 @@ provider screen). Use it as the test harness for changes to the contract.
 
 ---
 
+## Firmware OTA
+
+OTA is **user-triggered from the dashboard**, never automatic. Devices are gated by a
+`firmwareUpdatePending` flag on the `Device` row.
+
+**Flow.**
+
+1. Server fetches a release manifest from GitHub on startup and every 5 min thereafter.
+   `FIRMWARE_REPO` (default `Nikorag/Jellybox-Firmware`) and `FIRMWARE_VERSION` (default
+   `latest`) control what URL is fetched. The last good manifest is kept in memory; a failed
+   fetch falls back to it. Cold start with no successful fetch = no updates can be issued.
+2. Each device polls `GET /api/device/me` every 30 s and includes its running version as
+   `?version=<tag>`. The server records that on the row.
+3. The dashboard's Firmware card compares the running version to the manifest version. The
+   user clicks **Update firmware** → server action sets `firmwareUpdatePending=true`.
+4. On the next `/api/device/me` poll, the server includes a `latestFirmware: { version, url }`
+   block in the response (only when `firmwareUpdatePending` is true). The device then downloads
+   the binary directly from GitHub, flashes it, and reboots.
+5. After reboot the device reports the new version. The route compares it to the manifest; if
+   they match, `firmwareUpdatePending` is cleared automatically.
+
+**Where this lives.**
+
+| Concern              | File                                                  |
+|----------------------|-------------------------------------------------------|
+| Manifest fetch/cache | `src/lib/firmware-manifest.ts` (or equivalent)        |
+| Per-poll response    | `src/app/api/device/me/route.ts`                      |
+| Pending-flag mutation| `src/app/dashboard/devices/actions.ts`                |
+| Dashboard UI         | `src/components/devices/DeviceDetail.tsx`             |
+
+If you fork the firmware, your release CI must publish a `manifest.json` asset alongside the
+`.bin` with at least `version` (string) and `url` (string) fields.
+
+---
+
 ## Environment Variables
 
 | Variable                  | Purpose                                       | Where set              |
@@ -348,6 +385,15 @@ provider screen). Use it as the test harness for changes to the contract.
 | `NEXT_PUBLIC_APP_URL`     | Public URL (used in email links)              | Vercel dashboard / .env|
 | `ADMINS`                  | Comma-separated admin emails for extension management. Empty/unset = closed | Vercel dashboard / .env|
 | `NEXT_DEV_ORIGINS`        | (Dev only) Comma-separated LAN hosts allowed when running `next dev -H 0.0.0.0` | `.env.local`        |
+| `AUTH_OIDC_ISSUER`        | (Optional) OIDC issuer URL — enables generic SSO when set with `_ID` and `_SECRET` | Vercel dashboard / .env|
+| `AUTH_OIDC_ID`            | (Optional) OIDC client ID                     | Vercel dashboard / .env|
+| `AUTH_OIDC_SECRET`        | (Optional) OIDC client secret                 | Vercel dashboard / .env|
+| `AUTH_OIDC_NAME`          | (Optional) Button label for the OIDC provider | Vercel dashboard / .env|
+| `AUTH_DISABLE_GOOGLE`     | (Optional) Set `true` to disable Google sign-in entirely | Vercel dashboard / .env|
+| `AUTH_DISABLE_SIGNUP`     | (Optional) Set `true` to disable account creation | Vercel dashboard / .env|
+| `DISABLE_PUBLIC_PAGES`    | (Optional) Set `true` to hide landing/docs from anonymous users | Vercel dashboard / .env|
+| `FIRMWARE_REPO`           | (Optional) GitHub `owner/name` of the firmware repo polled for OTA. Defaults to `Nikorag/Jellybox-Firmware` | Vercel dashboard / .env|
+| `FIRMWARE_VERSION`        | (Optional) Pin all devices to a specific firmware tag. Unset/`latest` = newest GitHub release | Vercel dashboard / .env|
 
 ⚠ **Never change `JELLYFIN_ENCRYPTION_KEY` in production** — doing so will invalidate every
 stored Jellyfin API token and require all users to re-link their servers.
@@ -402,7 +448,7 @@ E2E tests use a real database — `e2e/global-setup.ts` seeds the test user.
 2. For server actions: add to the relevant `actions.ts` file in `src/app/(dashboard)/[feature]/`.
 3. Validate input with Zod.
 4. Write Jest tests in `src/__tests__/api/` or `src/__tests__/actions/`.
-5. Update `src/middleware.ts` if the route needs protection (or exemption).
+5. Update `src/proxy.ts` if the route needs protection (or exemption).
 
 ### Adding a new DB entity / model
 
@@ -483,6 +529,8 @@ Extensions live outside this repo — they're standalone HTTP services.
 - **Required dashboard env vars:** All variables in `.env.example` must be set.
 - **Google OAuth redirect URI:** Add `https://your-domain.com/api/auth/callback/google`
   to the authorised redirect URIs in Google Cloud Console.
+- **Generic OIDC redirect URI:** If `AUTH_OIDC_*` is configured, register
+  `https://your-domain.com/api/auth/callback/oidc` with the OIDC provider.
 - **Resend domain verification:** Verify your sending domain in the Resend dashboard.
 
 ---

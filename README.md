@@ -190,8 +190,8 @@ jellybox-server/
 │   └── seed.ts                # Dev seed script
 ├── src/
 │   ├── app/
-│   │   ├── (auth)/            # Sign-in, sign-up, email verification, password reset
-│   │   ├── (dashboard)/       # Authenticated dashboard routes
+│   │   ├── auth/              # Sign-in, sign-up, email verification, password reset
+│   │   ├── dashboard/         # Authenticated dashboard routes (protected by proxy.ts)
 │   │   │   ├── dashboard/     # Overview page
 │   │   │   ├── devices/       # Device management
 │   │   │   ├── tags/          # RFID tag management
@@ -204,8 +204,9 @@ jellybox-server/
 │   │   │   ├── extensions/    # Extension registry + per-user account routes
 │   │   │   └── health/        # GET /api/health
 │   │   └── page.tsx           # Landing page
-│   ├── auth.ts                # NextAuth v5 configuration
-│   ├── middleware.ts           # Route protection
+│   ├── auth.ts                # NextAuth v5 configuration (Node.js)
+│   ├── auth.config.ts         # Edge-safe NextAuth config (used by proxy.ts)
+│   ├── proxy.ts               # Next.js 16 middleware — route protection
 │   ├── components/
 │   │   ├── ui/                # Primitive components (Button, Input, Card…)
 │   │   ├── auth/              # Auth form components
