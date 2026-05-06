@@ -26,10 +26,10 @@ export default async function LandingPage() {
       src: '/product.png',
       alt: 'Jellybox device on a desk with four collectible figurines on coloured bases — a robot, dinosaur, wizard and cat.',
     },
-    {
-      src: '/product_two.png',
-      alt: 'Jellybox on a living-room console with a kids cartoon playing on the TV behind it — the eInk screen shows "Ready to scan".',
-    },
+//    {
+//      src: '/product_two.png',
+//      alt: 'Jellybox on a living-room console with a kids cartoon playing on the TV behind it — the eInk screen shows "Ready to scan".',
+//    },
   ]
   const heroImage = heroImages[Math.floor(Math.random() * heroImages.length)]
 

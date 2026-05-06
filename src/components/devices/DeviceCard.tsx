@@ -36,7 +36,7 @@ export default function DeviceCard({ device }: { device: DeviceWithClient }) {
           )}
           {device.firmwareVersion && (
             <span className="text-xs text-jf-text-muted hidden sm:block">
-              v{device.firmwareVersion}
+              {device.firmwareVersion}
             </span>
           )}
           <Link href={`/dashboard/devices/${device.id}`}>
