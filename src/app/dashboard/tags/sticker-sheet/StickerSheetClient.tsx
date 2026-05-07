@@ -40,6 +40,7 @@ interface Sticker {
   logoUrl: string
   orientation: Orientation
   textColor: string
+  hideTitle: boolean
 }
 
 type Step = 'select' | 'edit'
@@ -56,11 +57,14 @@ function blankSticker(): Sticker {
     logoUrl: '',
     orientation: 'landscape',
     textColor: '#000000',
+    hideTitle: false,
   }
 }
 
 function isRenderable(s: Sticker) {
-  return Boolean(s.logoUrl) && Boolean(s.title || s.textmarkUrl)
+  if (!s.logoUrl) return false
+  if (s.hideTitle) return true
+  return Boolean(s.title || s.textmarkUrl)
 }
 
 async function fileToDataUrl(file: File): Promise<string> {
@@ -107,6 +111,7 @@ export default function StickerSheetClient({ prefill }: { prefill: PrefillSticke
       logoUrl: p.logoUrl ?? '',
       orientation: 'landscape',
       textColor: '#000000',
+      hideTitle: false,
     }))
     if (next.length === 0) next.push(blankSticker())
     setStickers(next)
@@ -391,6 +396,7 @@ function StickerRow({
 }) {
   const valid = isRenderable(sticker)
   const hasTextmark = Boolean(sticker.textmarkUrl)
+  const titleHidden = sticker.hideTitle
 
   return (
     <Card>
@@ -405,7 +411,9 @@ function StickerRow({
                 <span className="text-jf-success font-medium">Ready</span>
               ) : (
                 <span className="text-jf-text-muted">
-                  Needs logo + {hasTextmark ? 'nothing else' : 'title or textmark'}
+                  {titleHidden
+                    ? 'Needs logo'
+                    : `Needs logo + ${hasTextmark ? 'nothing else' : 'title or textmark'}`}
                 </span>
               )}
             </div>
@@ -449,7 +457,18 @@ function StickerRow({
               onChange={(e) => onChange({ textColor: e.target.value })}
               className="h-7 w-9 rounded border border-jf-border bg-jf-elevated cursor-pointer"
               aria-label="Title text colour"
+              disabled={titleHidden}
             />
+          </label>
+
+          <label className="inline-flex items-center gap-2 text-xs text-jf-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={titleHidden}
+              onChange={(e) => onChange({ hideTitle: e.target.checked })}
+              className="form-checkbox rounded bg-jf-elevated border-jf-border text-jf-primary focus:ring-jf-primary/30"
+            />
+            Hide title (centre logo)
           </label>
         </div>
 
@@ -459,15 +478,27 @@ function StickerRow({
             label="Title"
             value={sticker.title}
             onChange={(e) => onChange({ title: e.target.value })}
-            helperText={hasTextmark ? 'Hidden when a textmark is set.' : undefined}
+            helperText={
+              titleHidden
+                ? 'Hidden — logo is centred on the sticker.'
+                : hasTextmark
+                  ? 'Hidden when a textmark is set.'
+                  : undefined
+            }
             placeholder="e.g. Toy Story"
+            disabled={titleHidden}
           />
 
           <ImageField
             label="Textmark (optional)"
             url={sticker.textmarkUrl}
             onChange={(url) => onChange({ textmarkUrl: url })}
-            helperText="Wordmark image. If set, replaces the title."
+            helperText={
+              titleHidden
+                ? 'Hidden — logo is centred on the sticker.'
+                : 'Wordmark image. If set, replaces the title.'
+            }
+            disabled={titleHidden}
           />
 
           <ImageField
@@ -489,11 +520,13 @@ function ImageField({
   url,
   onChange,
   helperText,
+  disabled = false,
 }: {
   label: string
   url: string
   onChange: (url: string) => void
   helperText?: string
+  disabled?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const isData = url.startsWith('data:')
@@ -515,7 +548,7 @@ function ImageField({
           value={isData ? '' : url}
           onChange={(e) => onChange(e.target.value)}
           placeholder={isData ? 'Uploaded image' : 'https://… or upload'}
-          disabled={isData}
+          disabled={isData || disabled}
           className="form-input flex-1 min-w-0 rounded-lg bg-jf-elevated border-jf-border text-jf-text-primary text-sm focus:border-jf-primary focus:ring-jf-primary/30 disabled:opacity-60"
         />
         <input
@@ -526,11 +559,11 @@ function ImageField({
           className="hidden"
         />
         <div className="flex gap-2 shrink-0">
-          <Button type="button" variant="secondary" size="sm" onClick={() => inputRef.current?.click()}>
+          <Button type="button" variant="secondary" size="sm" onClick={() => inputRef.current?.click()} disabled={disabled}>
             Upload
           </Button>
           {url && (
-            <Button type="button" variant="secondary" size="sm" onClick={() => onChange('')}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => onChange('')} disabled={disabled}>
               Clear
             </Button>
           )}
@@ -600,13 +633,41 @@ function StickerContent({
   screenScale: number
   portrait: boolean
 }) {
-  const showTextmark = Boolean(sticker.textmarkUrl)
-  const showTitle = !showTextmark && Boolean(sticker.title)
+  const showTextmark = !sticker.hideTitle && Boolean(sticker.textmarkUrl)
+  const showTitle = !sticker.hideTitle && !showTextmark && Boolean(sticker.title)
+  const logoOnly = sticker.hideTitle
 
   // Logo slot for landscape: square sized to the shorter inner dimension.
   const innerHeightMm = CARD_HEIGHT_MM - SAFE_BORDER_MM * 2
   const innerWidthMm = CARD_WIDTH_MM - SAFE_BORDER_MM * 2
   const landscapeLogoMm = Math.min(innerWidthMm, innerHeightMm)
+
+  if (logoOnly) {
+    return (
+      <div
+        style={{
+          boxSizing: 'border-box',
+          width: '100%',
+          height: '100%',
+          padding: `${SAFE_BORDER_MM * screenScale}mm`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {sticker.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={sticker.logoUrl}
+            alt=""
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', border: '1px dashed rgba(0,0,0,0.2)', borderRadius: '2mm' }} />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div
