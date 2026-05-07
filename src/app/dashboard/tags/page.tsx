@@ -26,9 +26,16 @@ export default async function TagsPage() {
         title="RFID Tags"
         description="Assign your physical RFID tags to content from your Jellyfin library."
         action={
-          <Link href="/dashboard/tags/new">
-            <Button size="sm">Register Tag</Button>
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/dashboard/tags/sticker-sheet">
+              <Button size="sm" variant="secondary" disabled={tags.length === 0}>
+                Create sticker sheet
+              </Button>
+            </Link>
+            <Link href="/dashboard/tags/new">
+              <Button size="sm">Register Tag</Button>
+            </Link>
+          </div>
         }
       />
       <TagGrid tags={tags} />

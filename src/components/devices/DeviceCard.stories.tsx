@@ -34,6 +34,7 @@ export const WithClient: Story = {
         jellyfinServerId: 'server-1',
         jellyfinDeviceId: 'jf-device-1',
         deviceName: 'Living Room TV',
+        nickname: null,
         lastSeenAt: new Date(),
         createdAt: new Date(),
       },
