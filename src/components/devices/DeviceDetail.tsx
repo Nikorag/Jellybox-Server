@@ -96,7 +96,7 @@ export default function DeviceDetail({
                 <option value="">— None —</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.deviceName}
+                    {c.nickname ?? c.deviceName}
                   </option>
                 ))}
               </select>

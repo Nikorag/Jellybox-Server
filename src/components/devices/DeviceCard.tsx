@@ -31,7 +31,7 @@ export default function DeviceCard({ device }: { device: DeviceWithClient }) {
         <div className="flex items-center gap-3 flex-shrink-0">
           {device.defaultClient && (
             <Badge variant="neutral" className="hidden sm:inline-flex">
-              {device.defaultClient.deviceName}
+              {device.defaultClient.nickname ?? device.defaultClient.deviceName}
             </Badge>
           )}
           {device.firmwareVersion && (

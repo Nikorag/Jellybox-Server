@@ -109,6 +109,24 @@ export async function saveJellyfinClientAction(
   return {}
 }
 
+export async function renameJellyfinClientAction(
+  clientId: string,
+  nickname: string,
+): Promise<{ error?: string }> {
+  const session = await auth()
+  if (!session?.user?.id) return { error: 'Unauthorised' }
+
+  const trimmed = nickname.trim()
+  await db.jellyfinClient.updateMany({
+    where: { id: clientId, userId: session.user.id },
+    data: { nickname: trimmed === '' ? null : trimmed },
+  })
+
+  revalidatePath('/dashboard/jellyfin/clients')
+  revalidatePath('/dashboard/devices')
+  return {}
+}
+
 export async function deleteJellyfinClientAction(
   clientId: string,
 ): Promise<{ error?: string }> {

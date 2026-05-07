@@ -139,6 +139,8 @@ model JellyfinClient {
   /// Jellyfin's persistent DeviceId (stable across sessions)
   jellyfinDeviceId String
   deviceName       String
+  /// Optional user-chosen nickname displayed in place of deviceName in the dashboard
+  nickname         String?
   lastSeenAt       DateTime @default(now())
 
   createdAt DateTime @default(now())
