@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Card, CardContent, EmptyState, Input } from '@/components/ui'
+import ContentPicker from '@/components/tags/ContentPicker'
+import type { JellyfinItem } from '@/lib/jellyfin'
 
 // ─── Print constants (millimetres) ──────────────────────────────────────────
 export const A4_WIDTH_MM = 210
@@ -78,7 +80,13 @@ async function fileToDataUrl(file: File): Promise<string> {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function StickerSheetClient({ prefill }: { prefill: PrefillSticker[] }) {
+export default function StickerSheetClient({
+  prefill,
+  jellyfinLinked = false,
+}: {
+  prefill: PrefillSticker[]
+  jellyfinLinked?: boolean
+}) {
   const [step, setStep] = useState<Step>('select')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(prefill.map((p) => p.id)),
@@ -136,6 +144,7 @@ export default function StickerSheetClient({ prefill }: { prefill: PrefillSticke
       stickers={stickers}
       setStickers={setStickers}
       onBack={() => setStep('select')}
+      jellyfinLinked={jellyfinLinked}
     />
   )
 }
@@ -247,10 +256,12 @@ function EditStep({
   stickers,
   setStickers,
   onBack,
+  jellyfinLinked,
 }: {
   stickers: Sticker[]
   setStickers: React.Dispatch<React.SetStateAction<Sticker[]>>
   onBack: () => void
+  jellyfinLinked: boolean
 }) {
   const [dirty, setDirty] = useState(false)
 
@@ -343,6 +354,7 @@ function EditStep({
               onChange={(patch) => update(sticker.id, patch)}
               onMove={(dir) => move(sticker.id, dir)}
               onRemove={() => remove(sticker.id)}
+              jellyfinLinked={jellyfinLinked}
             />
           ))}
         </div>
@@ -386,6 +398,7 @@ function StickerRow({
   onChange,
   onMove,
   onRemove,
+  jellyfinLinked,
 }: {
   sticker: Sticker
   index: number
@@ -393,6 +406,7 @@ function StickerRow({
   onChange: (patch: Partial<Sticker>) => void
   onMove: (dir: -1 | 1) => void
   onRemove: () => void
+  jellyfinLinked: boolean
 }) {
   const valid = isRenderable(sticker)
   const hasTextmark = Boolean(sticker.textmarkUrl)
@@ -506,6 +520,7 @@ function StickerRow({
             url={sticker.logoUrl}
             onChange={(url) => onChange({ logoUrl: url })}
             helperText="Brand mark or artwork."
+            allowJellyfinPicker={jellyfinLinked}
           />
         </div>
       </CardContent>
@@ -521,14 +536,17 @@ function ImageField({
   onChange,
   helperText,
   disabled = false,
+  allowJellyfinPicker = false,
 }: {
   label: string
   url: string
   onChange: (url: string) => void
   helperText?: string
   disabled?: boolean
+  allowJellyfinPicker?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const isData = url.startsWith('data:')
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -537,6 +555,14 @@ function ImageField({
     const dataUrl = await fileToDataUrl(file)
     onChange(dataUrl)
     if (inputRef.current) inputRef.current.value = ''
+  }
+
+  function handleJellyfinSelect(item: JellyfinItem) {
+    const tag = item.ImageTags?.Primary
+    const params = new URLSearchParams({ itemId: item.Id, width: '600' })
+    if (tag) params.set('tag', tag)
+    onChange(`/api/jellyfin/image?${params.toString()}`)
+    setPickerOpen(false)
   }
 
   return (
@@ -562,6 +588,11 @@ function ImageField({
           <Button type="button" variant="secondary" size="sm" onClick={() => inputRef.current?.click()} disabled={disabled}>
             Upload
           </Button>
+          {allowJellyfinPicker && (
+            <Button type="button" variant="secondary" size="sm" onClick={() => setPickerOpen(true)} disabled={disabled}>
+              Jellyfin…
+            </Button>
+          )}
           {url && (
             <Button type="button" variant="secondary" size="sm" onClick={() => onChange('')} disabled={disabled}>
               Clear
@@ -570,6 +601,14 @@ function ImageField({
         </div>
       </div>
       {helperText && <p className="text-xs text-jf-text-muted">{helperText}</p>}
+
+      {allowJellyfinPicker && (
+        <ContentPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={handleJellyfinSelect}
+        />
+      )}
     </div>
   )
 }
