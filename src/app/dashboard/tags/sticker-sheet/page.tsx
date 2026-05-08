@@ -14,10 +14,13 @@ export default async function StickerSheetPage() {
 
   const accountId = await getActiveAccountId(session.user.id)
 
-  const tags = await db.rfidTag.findMany({
-    where: { userId: accountId },
-    orderBy: { createdAt: 'desc' },
-  })
+  const [tags, server] = await Promise.all([
+    db.rfidTag.findMany({
+      where: { userId: accountId },
+      orderBy: { createdAt: 'desc' },
+    }),
+    db.jellyfinServer.findUnique({ where: { userId: accountId } }),
+  ])
 
   const prefill: PrefillSticker[] = tags.map((tag) => {
     let logoUrl: string | null = null
@@ -44,7 +47,7 @@ export default async function StickerSheetPage() {
           description="Print credit-card-sized stickers for your tags."
         />
       </div>
-      <StickerSheetClient prefill={prefill} />
+      <StickerSheetClient prefill={prefill} jellyfinLinked={Boolean(server)} />
     </div>
   )
 }
