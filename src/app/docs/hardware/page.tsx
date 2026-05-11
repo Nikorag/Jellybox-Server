@@ -122,15 +122,16 @@ export default function HardwarePage() {
         </p>
 
         <figure className="mt-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
-          <div className="relative aspect-[4/3]">
-            <Image
-              src="/wiring.png"
-              alt="Wiring diagram showing the ESP32 connected to the PN532 NFC reader, Waveshare eInk display, and NeoPixel ring."
-              fill
-              sizes="(max-width: 768px) 100vw, 720px"
-              className="object-contain"
-            />
-          </div>
+          <Image
+            src="/wiring.png"
+            alt="Wiring diagram showing the ESP32 connected to the PN532 NFC reader, Waveshare eInk display, and NeoPixel ring."
+            width={1600}
+            height={1200}
+            sizes="(max-width: 768px) 100vw, 720px"
+            className="w-full h-auto"
+            priority
+            unoptimized
+          />
           <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
             Wiring overview — ESP32 to PN532, eInk display, and NeoPixel ring.
           </figcaption>
