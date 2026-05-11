@@ -21,8 +21,12 @@ import type { Extension } from '@prisma/client'
 export type PlaySuccess = { type: 'success'; content: string | undefined }
 export type PlayFailure = { type: 'failure'; code: string; message: string }
 
+export type JellyfinPlayTarget =
+  | { kind: 'client'; jellyfinDeviceId: string }
+  | { kind: 'user'; jellyfinUserId: string }
+
 export async function attemptJellyfinPlay({
-  client,
+  target,
   server,
   apiToken,
   customHeaders,
@@ -36,18 +40,24 @@ export async function attemptJellyfinPlay({
     resumePlayback: boolean
     shuffle: boolean
   }
-  client: { jellyfinDeviceId: string }
+  target: JellyfinPlayTarget
   server: { serverUrl: string }
   apiToken: string
   customHeaders: Record<string, string>
 }): Promise<PlaySuccess | PlayFailure> {
   try {
     const sessions = await jellyfinGetSessions(server.serverUrl, apiToken, customHeaders)
-    const liveSession = sessions.find(
-      (s) => s.DeviceId === client.jellyfinDeviceId && s.SupportsRemoteControl !== false,
-    )
+    const liveSession = sessions.find((s) => {
+      if (s.SupportsRemoteControl === false) return false
+      if (target.kind === 'client') return s.DeviceId === target.jellyfinDeviceId
+      return s.UserId === target.jellyfinUserId
+    })
     if (!liveSession) {
-      return { type: 'failure', code: PLAY_ERROR.OFFLINE, message: 'Playback client is not active.' }
+      const message =
+        target.kind === 'client'
+          ? 'Playback client is not active.'
+          : 'No active Jellyfin clients for this user.'
+      return { type: 'failure', code: PLAY_ERROR.OFFLINE, message }
     }
 
     let playItemId = tag.jellyfinItemId!

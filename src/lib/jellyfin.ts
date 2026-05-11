@@ -167,6 +167,20 @@ export async function jellyfinGetSystemInfo(
   return jellyfinFetch<JellyfinSystemInfo>(serverUrl, '/System/Info', apiToken, undefined, customHeaders)
 }
 
+export interface JellyfinUser {
+  Id: string
+  Name: string
+}
+
+/** List Jellyfin users on the server. */
+export async function jellyfinGetUsers(
+  serverUrl: string,
+  apiToken: string,
+  customHeaders?: Record<string, string>,
+): Promise<JellyfinUser[]> {
+  return jellyfinFetch<JellyfinUser[]>(serverUrl, '/Users', apiToken, undefined, customHeaders)
+}
+
 /** Fetch active Jellyfin sessions (playback clients). */
 export async function jellyfinGetSessions(
   serverUrl: string,

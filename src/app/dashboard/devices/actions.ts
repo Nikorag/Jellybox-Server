@@ -13,7 +13,8 @@ const createDeviceSchema = z.object({
 
 const updateDeviceSchema = z.object({
   name: z.string().min(1).max(64).optional(),
-  defaultClientId: z.string().nullable().optional(),
+  /// Encoded target: empty string = none, "client:<id>", or "user:<jellyfinUserId>:<displayName>".
+  defaultTarget: z.string().optional(),
 })
 
 export type CreateDeviceResult =
@@ -60,20 +61,52 @@ export async function updateDeviceAction(
 
   const parsed = updateDeviceSchema.safeParse({
     name: formData.get('name') ?? undefined,
-    defaultClientId: formData.get('defaultClientId') ?? undefined,
+    defaultTarget: formData.get('defaultTarget') ?? undefined,
   })
 
   if (!parsed.success) {
     return { error: parsed.error.errors[0]?.message ?? 'Invalid input.' }
   }
 
+  let targetUpdate: {
+    defaultClientId?: string | null
+    defaultJellyfinUserId?: string | null
+    defaultJellyfinUserName?: string | null
+  } = {}
+  if (parsed.data.defaultTarget !== undefined) {
+    const raw = parsed.data.defaultTarget
+    if (raw === '') {
+      targetUpdate = { defaultClientId: null, defaultJellyfinUserId: null, defaultJellyfinUserName: null }
+    } else if (raw.startsWith('client:')) {
+      const clientId = raw.slice('client:'.length)
+      // Verify the client belongs to this account before linking
+      const client = await db.jellyfinClient.findFirst({
+        where: { id: clientId, userId: accountId },
+        select: { id: true },
+      })
+      if (!client) return { error: 'Unknown Jellyfin client.' }
+      targetUpdate = { defaultClientId: clientId, defaultJellyfinUserId: null, defaultJellyfinUserName: null }
+    } else if (raw.startsWith('user:')) {
+      const rest = raw.slice('user:'.length)
+      const sep = rest.indexOf(':')
+      const jellyfinUserId = sep >= 0 ? rest.slice(0, sep) : rest
+      const jellyfinUserName = sep >= 0 ? rest.slice(sep + 1) : ''
+      if (!jellyfinUserId) return { error: 'Invalid Jellyfin user.' }
+      targetUpdate = {
+        defaultClientId: null,
+        defaultJellyfinUserId: jellyfinUserId,
+        defaultJellyfinUserName: jellyfinUserName || null,
+      }
+    } else {
+      return { error: 'Invalid playback target.' }
+    }
+  }
+
   await db.device.updateMany({
     where: { id: deviceId, userId: accountId },
     data: {
       ...(parsed.data.name !== undefined && { name: parsed.data.name }),
-      ...(parsed.data.defaultClientId !== undefined && {
-        defaultClientId: parsed.data.defaultClientId,
-      }),
+      ...targetUpdate,
     },
   })
 

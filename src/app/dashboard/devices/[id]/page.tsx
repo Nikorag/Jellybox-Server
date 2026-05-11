@@ -6,6 +6,8 @@ import { getActiveAccountId } from '@/lib/context'
 import { PageHeader } from '@/components/ui'
 import DeviceDetail from '@/components/devices/DeviceDetail'
 import { getFirmwareManifest } from '@/lib/firmware-manifest'
+import { decrypt } from '@/lib/crypto'
+import { jellyfinGetUsers } from '@/lib/jellyfin'
 
 export const metadata: Metadata = { title: 'Device Settings' }
 
@@ -27,6 +29,20 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
     orderBy: { deviceName: 'asc' },
   })
 
+  const server = await db.jellyfinServer.findUnique({ where: { userId: accountId } })
+  let jellyfinUsers: { Id: string; Name: string }[] = []
+  if (server) {
+    try {
+      const apiToken = decrypt(server.apiToken)
+      const customHeaders = server.customHeaders
+        ? (() => { try { return JSON.parse(decrypt(server.customHeaders!)) as Record<string, string> } catch { return {} } })()
+        : undefined
+      jellyfinUsers = await jellyfinGetUsers(server.serverUrl, apiToken, customHeaders)
+    } catch {
+      jellyfinUsers = []
+    }
+  }
+
   const manifest = await getFirmwareManifest()
   const latestFirmwareVersion = manifest?.version ?? null
 
@@ -36,6 +52,7 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
       <DeviceDetail
         device={device}
         clients={clients}
+        jellyfinUsers={jellyfinUsers}
         latestFirmwareVersion={latestFirmwareVersion}
       />
     </div>

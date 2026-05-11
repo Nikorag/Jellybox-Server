@@ -259,12 +259,23 @@ export async function triggerTagAction(
     })
   } else {
     const device = await db.device.findFirst({
-      where: { userId: accountId, defaultClientId: { not: null } },
+      where: {
+        userId: accountId,
+        OR: [
+          { defaultClientId: { not: null } },
+          { defaultJellyfinUserId: { not: null } },
+        ],
+      },
       include: { defaultClient: true },
       orderBy: { createdAt: 'asc' },
     })
-    if (!device?.defaultClient) {
-      return { error: 'No device with a default Jellyfin client is set up. Configure one under Devices first.' }
+    const target: import('@/lib/play/dispatch').JellyfinPlayTarget | null = device?.defaultJellyfinUserId
+      ? { kind: 'user', jellyfinUserId: device.defaultJellyfinUserId }
+      : device?.defaultClient
+        ? { kind: 'client', jellyfinDeviceId: device.defaultClient.jellyfinDeviceId }
+        : null
+    if (!device || !target) {
+      return { error: 'No device with a default Jellyfin client or user is set up. Configure one under Devices first.' }
     }
     const server = await db.jellyfinServer.findUnique({ where: { userId: accountId } })
     if (!server) return { error: 'No Jellyfin server linked to this account.' }
@@ -283,7 +294,7 @@ export async function triggerTagAction(
         resumePlayback: tag.resumePlayback,
         shuffle: tag.shuffle,
       },
-      client: device.defaultClient,
+      target,
       server,
       apiToken,
       customHeaders,

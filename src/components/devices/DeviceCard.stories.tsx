@@ -26,6 +26,8 @@ export const WithClient: Story = {
       scanModeToken: null,
       scanModeExpiresAt: null,
       pendingScanTagId: null,
+      defaultJellyfinUserId: null,
+      defaultJellyfinUserName: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       defaultClient: {
@@ -58,6 +60,8 @@ export const NoClient: Story = {
       scanModeToken: null,
       scanModeExpiresAt: null,
       pendingScanTagId: null,
+      defaultJellyfinUserId: null,
+      defaultJellyfinUserName: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       defaultClient: null,

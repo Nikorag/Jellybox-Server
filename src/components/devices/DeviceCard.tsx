@@ -29,11 +29,15 @@ export default function DeviceCard({ device }: { device: DeviceWithClient }) {
         </div>
 
         <div className="flex items-center gap-3 flex-shrink-0">
-          {device.defaultClient && (
+          {device.defaultJellyfinUserId ? (
+            <Badge variant="neutral" className="hidden sm:inline-flex">
+              {device.defaultJellyfinUserName ?? 'Jellyfin user'}
+            </Badge>
+          ) : device.defaultClient ? (
             <Badge variant="neutral" className="hidden sm:inline-flex">
               {device.defaultClient.nickname ?? device.defaultClient.deviceName}
             </Badge>
-          )}
+          ) : null}
           {device.firmwareVersion && (
             <span className="text-xs text-jf-text-muted hidden sm:block">
               {device.firmwareVersion}

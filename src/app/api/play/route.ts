@@ -232,8 +232,13 @@ export async function POST(req: Request) {
         flags: { resumePlayback: tag.resumePlayback, shuffle: tag.shuffle },
       })
   } else {
-    const client = matchedDevice.defaultClient
-    if (!client) {
+    const target: import('@/lib/play/dispatch').JellyfinPlayTarget | null =
+      matchedDevice.defaultJellyfinUserId
+        ? { kind: 'user', jellyfinUserId: matchedDevice.defaultJellyfinUserId }
+        : matchedDevice.defaultClient
+          ? { kind: 'client', jellyfinDeviceId: matchedDevice.defaultClient.jellyfinDeviceId }
+          : null
+    if (!target) {
       await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, false, PLAY_ERROR.NO_CLIENT)
       return NextResponse.json(
         { error: 'No default playback client configured for this device.', code: PLAY_ERROR.NO_CLIENT },
@@ -268,7 +273,7 @@ export async function POST(req: Request) {
           resumePlayback: tag.resumePlayback,
           shuffle: tag.shuffle,
         },
-        client,
+        target,
         server,
         apiToken,
         customHeaders,

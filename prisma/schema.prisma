@@ -218,6 +218,11 @@ model Device {
   /// First 8 characters of the raw API key — for display only
   apiKeyPrefix    String
   defaultClientId String?
+  /// Optional Jellyfin user id — when set, /play looks for any active session
+  /// for this user instead of a specific client. Mutually exclusive with defaultClientId.
+  defaultJellyfinUserId   String?
+  /// Display-only snapshot of the Jellyfin user name at the time of selection.
+  defaultJellyfinUserName String?
   lastSeenAt      DateTime?
   firmwareVersion String?
   /// When true, the next /api/device/me poll returns the latest firmware

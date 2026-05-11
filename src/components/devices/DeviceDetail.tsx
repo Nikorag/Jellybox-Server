@@ -16,15 +16,22 @@ type DeviceWithClient = Device & { defaultClient: JellyfinClient | null }
 export default function DeviceDetail({
   device,
   clients,
+  jellyfinUsers,
   latestFirmwareVersion,
 }: {
   device: DeviceWithClient
   clients: JellyfinClient[]
+  jellyfinUsers: { Id: string; Name: string }[]
   latestFirmwareVersion: string | null
 }) {
   const router = useRouter()
   const [name, setName] = useState(device.name)
-  const [defaultClientId, setDefaultClientId] = useState(device.defaultClientId ?? '')
+  const initialTarget = device.defaultJellyfinUserId
+    ? `user:${device.defaultJellyfinUserId}:${device.defaultJellyfinUserName ?? ''}`
+    : device.defaultClientId
+      ? `client:${device.defaultClientId}`
+      : ''
+  const [defaultTarget, setDefaultTarget] = useState(initialTarget)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -50,7 +57,7 @@ export default function DeviceDetail({
     setSaveError(null)
     const fd = new FormData()
     fd.set('name', name)
-    if (defaultClientId) fd.set('defaultClientId', defaultClientId)
+    fd.set('defaultTarget', defaultTarget)
     const res = await updateDeviceAction(device.id, fd)
     setSaving(false)
     if (res.error) setSaveError(res.error)
@@ -86,20 +93,37 @@ export default function DeviceDetail({
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-jf-text-secondary">
-                Default Jellyfin client
+                Default playback target
               </label>
               <select
-                value={defaultClientId}
-                onChange={(e) => setDefaultClientId(e.target.value)}
+                value={defaultTarget}
+                onChange={(e) => setDefaultTarget(e.target.value)}
                 className="form-select w-full rounded-lg bg-jf-elevated border-jf-border text-jf-text-primary text-sm focus:border-jf-primary focus:ring-jf-primary/30"
               >
                 <option value="">— None —</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nickname ?? c.deviceName}
-                  </option>
-                ))}
+                {clients.length > 0 && (
+                  <optgroup label="Specific client">
+                    {clients.map((c) => (
+                      <option key={c.id} value={`client:${c.id}`}>
+                        {c.nickname ?? c.deviceName}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {jellyfinUsers.length > 0 && (
+                  <optgroup label="Any active client for user">
+                    {jellyfinUsers.map((u) => (
+                      <option key={u.Id} value={`user:${u.Id}:${u.Name}`}>
+                        {u.Name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
+              <p className="text-xs text-jf-text-muted">
+                Pick a specific Jellyfin client, or a Jellyfin user — in which case playback is
+                sent to the first active client signed in as that user.
+              </p>
             </div>
 
             <Button type="submit" loading={saving}>Save Changes</Button>
