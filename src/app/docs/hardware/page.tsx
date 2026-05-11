@@ -103,7 +103,7 @@ const bom = [
   },
   {
     component: 'RFID/NFC tags (NTAG213 or NTAG215)',
-    notes: 'Standard ISO 14443A tags. Cards, stickers, or keyring fobs all work. Buy in packs of 10–50.',
+    notes: 'Standard ISO 14443A tags. Cards, stickers, or keyring fobs all work. Credit-card-format (CR80, 85.6 × 53.98 mm) PVC stickers pair with the dashboard\'s built-in sticker sheet designer (Tags → Create sticker sheet) for printable poster artwork. Buy in packs of 10–50.',
     qty: '10+',
   },
 ]
@@ -253,6 +253,48 @@ export default function HardwarePage() {
           The firmware does not use the ESP32&apos;s deep-sleep mode yet, so the device stays active
           while switched on. Expect a few hours of runtime from a 2000 mAh cell — flip the switch off
           between uses to extend battery life.
+        </p>
+      </section>
+
+      {/* Stickers */}
+      <section className="mb-10">
+        <SectionHeader
+          title="Tag stickers"
+          description="Credit-card-format NFC stickers are the easiest tag form factor — slim, cheap, and printable."
+        />
+        <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
+          Jellybox is built around standard ISO 14443A tags, but the recommended form factor is a{' '}
+          <strong className="text-jf-text-primary">CR80 credit-card-sized PVC sticker</strong>{' '}
+          (85.6 × 53.98 mm) with an embedded NTAG213 or NTAG215 chip. They&apos;re the same shape
+          as a bank card, so they sit neatly in a wallet, a binder pocket, or a display rack next
+          to the device — and the rigid white face takes printed artwork well.
+        </p>
+
+        <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
+          The dashboard includes a built-in <strong className="text-jf-text-primary">sticker
+          sheet designer</strong> at <Link href="/dashboard/tags/sticker-sheet"
+          className="text-jf-primary hover:underline">Tags → Create sticker sheet</Link>. It:
+        </p>
+
+        <ul className="text-sm text-jf-text-secondary leading-relaxed list-disc pl-5 space-y-1 mb-4">
+          <li>Pre-fills one sticker per registered RFID tag, pulling the poster or album artwork
+            from the linked Jellyfin (or extension) item.</li>
+          <li>Lays stickers out on A4 at exact CR80 dimensions, with cut marks and a safe-print
+            border so they trim cleanly with a guillotine or scissors.</li>
+          <li>Lets you tweak title text, swap artwork, choose landscape or portrait, and set text
+            colour per card before printing.</li>
+        </ul>
+
+        <Callout variant="warn">
+          Print at <strong>100% scale</strong> — disable any &ldquo;fit to page&rdquo; or
+          &ldquo;shrink to fit&rdquo; option in your browser&apos;s print dialog, or the
+          stickers won&apos;t line up with the cut marks.
+        </Callout>
+
+        <p className="text-sm text-jf-text-secondary leading-relaxed">
+          Look for &ldquo;NTAG213 PVC card&rdquo; or &ldquo;NTAG215 NFC card&rdquo; on Amazon or
+          AliExpress, sold in packs of 10–50. NTAG215 has more user memory (504 bytes) but
+          Jellybox only stores the UID, so NTAG213 (144 bytes) is plenty.
         </p>
       </section>
 
