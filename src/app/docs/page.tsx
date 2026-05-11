@@ -74,8 +74,7 @@ const guides = [
     ),
     title: 'Print the case',
     description: 'Downloadable STL files for the Jellybox enclosure, designed to fit the ESP32 dev board, eInk display, and NFC module.',
-    time: 'Coming soon',
-    soon: true,
+    time: '~5 min',
   },
 ]
 
@@ -102,12 +101,7 @@ export default function DocsPage() {
           <Link
             key={guide.href}
             href={guide.href}
-            className={[
-              'group flex flex-col gap-3 p-5 rounded-xl border transition-colors',
-              guide.soon
-                ? 'border-jf-border bg-jf-surface cursor-default pointer-events-none opacity-60'
-                : 'border-jf-border bg-jf-surface hover:border-jf-primary/40 hover:bg-jf-primary-muted',
-            ].join(' ')}
+            className="group flex flex-col gap-3 p-5 rounded-xl border border-jf-border bg-jf-surface hover:border-jf-primary/40 hover:bg-jf-primary-muted transition-colors"
           >
             <div className="flex items-start justify-between">
               <div className="w-9 h-9 rounded-lg bg-jf-primary-muted border border-jf-primary/30 flex items-center justify-center text-jf-primary">

@@ -3,14 +3,66 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
+import { db } from '@/lib/db'
+import { getActiveAccountId } from '@/lib/context'
 import { publicPagesDisabled } from '@/lib/auth-flags'
+import DashboardNav from '@/components/dashboard/DashboardNav'
 import DocsSidebar from './DocsSidebar'
 import DocsMobileNav from './DocsMobileNav'
 
 export default async function DocsLayout({ children }: { children: ReactNode }) {
-  if (publicPagesDisabled()) {
-    const session = await auth()
-    if (!session?.user?.id) redirect('/auth/signin')
+  const session = await auth()
+
+  if (publicPagesDisabled() && !session?.user?.id) {
+    redirect('/auth/signin')
+  }
+
+  if (session?.user?.id) {
+    const userId = session.user.id
+    const [partnerRows, activeAccountId] = await Promise.all([
+      db.accountPartner.findMany({
+        where: { partnerId: userId },
+        select: { owner: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: 'asc' },
+      }),
+      getActiveAccountId(userId),
+    ])
+    const partnerAccounts = partnerRows.map((r) => r.owner)
+
+    return (
+      <div className="flex h-screen bg-jf-bg overflow-hidden">
+        <DashboardNav
+          partnerAccounts={partnerAccounts}
+          activeAccountId={activeAccountId}
+          selfId={userId}
+          selfName={session.user.name ?? null}
+          selfEmail={session.user.email ?? ''}
+          selfImage={session.user.image ?? null}
+        />
+
+        <main className="flex-1 overflow-y-auto pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0 pb-[env(safe-area-inset-bottom)]">
+          <div className="flex">
+            {/* Docs secondary sidebar (desktop) */}
+            <aside className="w-56 flex-shrink-0 border-r border-jf-border bg-jf-surface hidden md:block">
+              <div className="sticky top-0 p-4">
+                <DocsSidebar />
+              </div>
+            </aside>
+
+            <div className="flex-1 min-w-0">
+              {/* Mobile docs nav strip */}
+              <div className="md:hidden border-b border-jf-border bg-jf-surface">
+                <DocsMobileNav />
+              </div>
+
+              <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+                {children}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (
