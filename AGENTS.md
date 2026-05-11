@@ -240,7 +240,8 @@ User
  │    └── extension → Extension
  ├── addedExtensions: Extension[]      # audit only — extensions this admin added
  ├── Device[] (0..n)
- │    └── defaultClient → JellyfinClient?
+ │    ├── defaultClient → JellyfinClient?         # specific client target
+ │    └── defaultJellyfinUserId / Name?           # OR fall back to first active client for this Jellyfin user
  ├── RfidTag[] (0..n)
  │    └── extension? → Extension       # alternative to jellyfin* fields
  └── ActivityLog[] (0..n)
@@ -491,7 +492,7 @@ Extensions live outside this repo — they're standalone HTTP services.
 
 2. **Neon connection pooling:** Use `DATABASE_URL` (pooled) for runtime queries and `DIRECT_URL` (direct) for Prisma migrations. Vercel serverless functions must use the pooled URL.
 
-3. **Jellyfin session IDs are ephemeral:** The playback API (`/api/play`) resolves the live Jellyfin session at request time by matching `DeviceId`. If the Jellyfin client is not active, it returns `OFFLINE`. Saved `JellyfinClient` records store the persistent `DeviceId`, not the ephemeral `SessionId`.
+3. **Jellyfin session IDs are ephemeral:** The playback API (`/api/play`) resolves the live Jellyfin session at request time. If the device is pinned to a specific client it matches on `DeviceId`; if pinned to a Jellyfin user (`Device.defaultJellyfinUserId`) it picks the first active session whose `UserId` matches. Either way, no active session ⇒ `OFFLINE`. Saved `JellyfinClient` records store the persistent `DeviceId`, not the ephemeral `SessionId`.
 
 4. **`JELLYFIN_ENCRYPTION_KEY` is permanent:** Once set in production, it must never change. Rotating it would invalidate all stored Jellyfin tokens.
 

@@ -6,7 +6,7 @@ Jellybox Server is a SaaS companion application for a physical RFID device that 
 Jellyfin media content by scanning physical tags. Parents register an account, link their Jellyfin
 server, pair their physical Jellybox device(s), and assign RFID tags to specific content. The
 server exposes a lightweight API that the physical device calls when a tag is scanned — triggering
-playback on the user's chosen Jellyfin client. The app is hosted on Vercel with a Neon PostgreSQL
+playback on the device's chosen target — either a specific Jellyfin client or any active client for a chosen Jellyfin user. The app is hosted on Vercel with a Neon PostgreSQL
 database.
 
 ---
@@ -92,7 +92,9 @@ Standard NextAuth VerificationToken — reused for email verification and passwo
 | name                | String    | User-assigned label                         |
 | apiKeyHash          | String    | bcrypt hash of the API key                  |
 | apiKeyPrefix        | String    | First 8 chars of API key for display        |
-| defaultClientId     | String?   | FK → JellyfinClient                         |
+| defaultClientId     | String?   | FK → JellyfinClient (specific client target) |
+| defaultJellyfinUserId | String? | Jellyfin user id — when set, play targets the first active client for this user (mutually exclusive with defaultClientId) |
+| defaultJellyfinUserName | String? | Display snapshot of the Jellyfin user name |
 | lastSeenAt          | DateTime? |                                             |
 | firmwareVersion     | String?   | Reported by device in API calls             |
 | createdAt           | DateTime  |                                             |
@@ -147,7 +149,7 @@ Standard NextAuth VerificationToken — reused for email verification and passwo
 | `/dashboard`                      | Overview: server status, devices, tag count, activity    |
 | `/dashboard/devices`              | List all paired devices                                  |
 | `/dashboard/devices/pair`         | Pair a new device (generate & display API key)           |
-| `/dashboard/devices/[id]`         | Device settings (name, default client, key rotation)     |
+| `/dashboard/devices/[id]`         | Device settings (name, default playback target — client or Jellyfin user, key rotation) |
 | `/dashboard/tags`                 | Tag library (card grid, search, filter)                  |
 | `/dashboard/tags/new`             | Register a new RFID tag                                  |
 | `/dashboard/tags/[id]`            | Edit tag assignment (browse Jellyfin library to assign)  |
