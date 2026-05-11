@@ -122,17 +122,17 @@ export default function HardwarePage() {
         </p>
 
         <figure className="mt-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
-          <div className="relative aspect-[4/5] sm:aspect-[3/2]">
+          <div className="relative aspect-[4/3]">
             <Image
-              src="/product.png"
-              alt="Assembled Jellybox device with its eInk screen, glowing NeoPixel ring, and a row of figurine tags in front of it."
+              src="/wiring.png"
+              alt="Wiring diagram showing the ESP32 connected to the PN532 NFC reader, Waveshare eInk display, and NeoPixel ring."
               fill
               sizes="(max-width: 768px) 100vw, 720px"
-              className="object-cover"
+              className="object-contain"
             />
           </div>
           <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
-            A finished Jellybox — slate enclosure, eInk screen, NeoPixel status ring, and figurine tags.
+            Wiring overview — ESP32 to PN532, eInk display, and NeoPixel ring.
           </figcaption>
         </figure>
       </div>
