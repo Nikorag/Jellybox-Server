@@ -15,6 +15,7 @@ interface SubNavItem {
   href: string
   label: string
   ownerOnly?: boolean
+  exact?: boolean
 }
 
 interface NavItem {
@@ -87,7 +88,6 @@ const navItems: NavItem[] = [
     ],
   },
   {
-    href: '/docs',
     label: 'Docs',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -95,6 +95,15 @@ const navItems: NavItem[] = [
           d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
       </svg>
     ),
+    children: [
+      { href: '/docs', label: 'Overview', exact: true },
+      { href: '/docs/server', label: 'Deploy to Vercel' },
+      { href: '/docs/self-hosting', label: 'Self-host with Docker' },
+      { href: '/docs/extensions', label: 'Extensions' },
+      { href: '/docs/hardware', label: 'Hardware & wiring' },
+      { href: '/docs/firmware', label: 'Flash the firmware' },
+      { href: '/docs/case', label: 'Case & STL files' },
+    ],
   },
   {
     href: '/dashboard/about',
@@ -138,7 +147,11 @@ function NavContent({
   onNavigate?: () => void
 }) {
   const isOnSettingsPath = settingsChildPaths.some((p) => pathname.startsWith(p))
-  const [settingsOpen, setSettingsOpen] = useState(isOnSettingsPath)
+  const isOnDocsPath = pathname === '/docs' || pathname.startsWith('/docs/')
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Settings: isOnSettingsPath,
+    Docs: isOnDocsPath,
+  })
 
   return (
     <>
@@ -157,12 +170,15 @@ function NavContent({
       <div className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
         {visibleItems.map((item) => {
           if (item.children) {
-            const isChildActive = item.children.some((c) => pathname.startsWith(c.href))
+            const isChildActive = item.children.some((c) =>
+              c.exact ? pathname === c.href : pathname.startsWith(c.href),
+            )
+            const isOpen = openGroups[item.label] ?? false
             return (
               <div key={item.label}>
                 <button
                   type="button"
-                  onClick={() => setSettingsOpen((o) => !o)}
+                  onClick={() => setOpenGroups((o) => ({ ...o, [item.label]: !o[item.label] }))}
                   className={cn(
                     'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
                     isChildActive
@@ -175,16 +191,16 @@ function NavContent({
                   </span>
                   <span className="flex-1 text-left">{item.label}</span>
                   <svg
-                    className={cn('w-4 h-4 transition-transform text-jf-text-muted', settingsOpen && 'rotate-180')}
+                    className={cn('w-4 h-4 transition-transform text-jf-text-muted', isOpen && 'rotate-180')}
                     fill="none" viewBox="0 0 24 24" stroke="currentColor"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
-                <div className={cn('mt-0.5 ml-4 pl-3 border-l border-jf-border space-y-0.5', !settingsOpen && 'hidden')}>
+                <div className={cn('mt-0.5 ml-4 pl-3 border-l border-jf-border space-y-0.5', !isOpen && 'hidden')}>
                     {item.children.map((child) => {
-                      const isActive = pathname.startsWith(child.href)
+                      const isActive = child.exact ? pathname === child.href : pathname.startsWith(child.href)
                       return (
                         <Link
                           key={child.href}

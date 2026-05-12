@@ -41,24 +41,8 @@ export default async function DocsLayout({ children }: { children: ReactNode }) 
         />
 
         <main className="flex-1 overflow-y-auto pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0 pb-[env(safe-area-inset-bottom)]">
-          <div className="flex">
-            {/* Docs secondary sidebar (desktop) */}
-            <aside className="w-56 flex-shrink-0 border-r border-jf-border bg-jf-surface hidden md:block">
-              <div className="sticky top-0 p-4">
-                <DocsSidebar />
-              </div>
-            </aside>
-
-            <div className="flex-1 min-w-0">
-              {/* Mobile docs nav strip */}
-              <div className="md:hidden border-b border-jf-border bg-jf-surface">
-                <DocsMobileNav />
-              </div>
-
-              <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-                {children}
-              </div>
-            </div>
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+            {children}
           </div>
         </main>
       </div>
