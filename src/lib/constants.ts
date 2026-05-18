@@ -23,6 +23,10 @@ export const RATE_LIMIT_WINDOW_SECONDS = 60
 export const JELLYFIN_REQUEST_TIMEOUT_MS = 8_000
 /** How many items to fetch per page when browsing the library */
 export const JELLYFIN_LIBRARY_PAGE_SIZE = 50
+/** Poll interval in ms while waiting for a client to report it has stopped */
+export const JELLYFIN_STOP_POLL_INTERVAL_MS = 200
+/** Max total time in ms to wait for a client to clear NowPlayingItem after Stop */
+export const JELLYFIN_STOP_WAIT_TIMEOUT_MS = 5_000
 
 // ─── Extensions ───────────────────────────────────────────────────────────────
 /** Timeout in ms for HTTP calls to third-party extensions */

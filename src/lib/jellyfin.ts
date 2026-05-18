@@ -1,4 +1,9 @@
-import { JELLYFIN_REQUEST_TIMEOUT_MS, JELLYFIN_LIBRARY_PAGE_SIZE } from '@/lib/constants'
+import {
+  JELLYFIN_REQUEST_TIMEOUT_MS,
+  JELLYFIN_LIBRARY_PAGE_SIZE,
+  JELLYFIN_STOP_POLL_INTERVAL_MS,
+  JELLYFIN_STOP_WAIT_TIMEOUT_MS,
+} from '@/lib/constants'
 
 export type JellyfinItemType = 'Movie' | 'Series' | 'Episode' | 'MusicAlbum' | 'Playlist'
 
@@ -282,6 +287,40 @@ export async function jellyfinGetNextEpisode(
   if (result.Items[0]) return result.Items[0]
   // All episodes watched — fall back to random
   return jellyfinGetRandomEpisode(serverUrl, apiToken, seriesId, customHeaders)
+}
+
+/** Stop playback on a specific Jellyfin session. */
+export async function jellyfinStop(
+  serverUrl: string,
+  apiToken: string,
+  sessionId: string,
+  customHeaders?: Record<string, string>,
+): Promise<void> {
+  const path = `/Sessions/${sessionId}/Playing/Stop`
+  console.log('[jellyfin] stop request:', path)
+  await jellyfinFetch<void>(serverUrl, path, apiToken, { method: 'POST' }, customHeaders)
+}
+
+/**
+ * Poll the sessions endpoint until the given session reports no NowPlayingItem,
+ * or the timeout elapses. Used after a Stop to ensure the client is idle before
+ * issuing a new PlayNow (some clients drop to the home screen instead of swapping
+ * if a Play command arrives while still playing).
+ */
+export async function jellyfinWaitForIdle(
+  serverUrl: string,
+  apiToken: string,
+  sessionId: string,
+  customHeaders?: Record<string, string>,
+): Promise<void> {
+  const deadline = Date.now() + JELLYFIN_STOP_WAIT_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    const sessions = await jellyfinGetSessions(serverUrl, apiToken, customHeaders)
+    const session = sessions.find((s) => s.Id === sessionId)
+    // Session disappeared or stopped playing — we're done.
+    if (!session || !session.NowPlayingItem) return
+    await new Promise((r) => setTimeout(r, JELLYFIN_STOP_POLL_INTERVAL_MS))
+  }
 }
 
 /** Trigger playback on a specific Jellyfin session. */

@@ -7,6 +7,8 @@
 import {
   jellyfinGetSessions,
   jellyfinPlay,
+  jellyfinStop,
+  jellyfinWaitForIdle,
   jellyfinGetRandomEpisode,
   jellyfinGetNextEpisode,
   JellyfinApiError,
@@ -76,6 +78,15 @@ export async function attemptJellyfinPlay({
       playItemTitle = episode.Name
     } else if (tag.shuffle) {
       playCommand = 'PlayShuffle'
+    }
+
+    // Some Jellyfin clients (web, JMP, Android TV) only drop to the home screen
+    // when a PlayNow command arrives while another item is already playing —
+    // the swap doesn't happen until a second PlayNow. Send an explicit Stop
+    // first and wait for the session to clear before issuing PlayNow.
+    if (liveSession.NowPlayingItem) {
+      await jellyfinStop(server.serverUrl, apiToken, liveSession.Id, customHeaders)
+      await jellyfinWaitForIdle(server.serverUrl, apiToken, liveSession.Id, customHeaders)
     }
 
     await jellyfinPlay(server.serverUrl, apiToken, liveSession.Id, playItemId, customHeaders, playCommand)
