@@ -286,6 +286,21 @@ export default function HardwarePage() {
             colour per card before printing.</li>
         </ul>
 
+        <figure className="my-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
+          <Image
+            src="/stickers.png"
+            alt="Sticker sheet designer preview — an A4 page laid out with CR80-sized cards, each showing poster artwork and a title, with cut marks between them."
+            width={1122}
+            height={1402}
+            sizes="(max-width: 768px) 100vw, 540px"
+            className="w-full h-auto"
+            unoptimized
+          />
+          <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
+            A printable A4 sticker sheet generated from your registered tags.
+          </figcaption>
+        </figure>
+
         <Callout variant="warn">
           Print at <strong>100% scale</strong> — disable any &ldquo;fit to page&rdquo; or
           &ldquo;shrink to fit&rdquo; option in your browser&apos;s print dialog, or the
