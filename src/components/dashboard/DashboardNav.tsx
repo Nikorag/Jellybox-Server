@@ -106,6 +106,17 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    href: '/dashboard/device-logs',
+    label: 'Device logs',
+    ownerOnly: true,
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+          d="M4 6h16M4 10h16M4 14h10M4 18h7" />
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard/about',
     label: 'About',
     icon: (
@@ -285,6 +296,7 @@ export default function DashboardNav({
   selfName,
   selfEmail,
   selfImage,
+  showDeviceLogs = false,
 }: {
   partnerAccounts: ContextAccount[]
   activeAccountId: string
@@ -292,12 +304,16 @@ export default function DashboardNav({
   selfName: string | null
   selfEmail: string
   selfImage?: string | null
+  showDeviceLogs?: boolean
 }) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const isPartnerContext = activeAccountId !== selfId
 
-  const visibleItems = navItems.filter((item) => !(item.ownerOnly && isPartnerContext))
+  const visibleItems = navItems.filter((item) => {
+    if (item.href === '/dashboard/device-logs' && !showDeviceLogs) return false
+    return !(item.ownerOnly && isPartnerContext)
+  })
 
   // Close mobile nav on route change
   useEffect(() => {

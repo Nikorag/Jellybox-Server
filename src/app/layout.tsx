@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next'
 import { Quicksand } from 'next/font/google'
+import { Suspense } from 'react'
 import './globals.css'
 import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants'
 import SessionProvider from '@/components/SessionProvider'
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration'
+import TopProgress from '@/components/ui/TopProgress'
 import { auth } from '@/auth'
 
 const quicksand = Quicksand({ subsets: ['latin'], variable: '--font-quicksand' })
@@ -44,6 +46,9 @@ export default async function RootLayout({
   return (
     <html lang="en" className={quicksand.variable}>
       <body className="bg-jf-bg text-jf-text-primary antialiased">
+        <Suspense fallback={null}>
+          <TopProgress />
+        </Suspense>
         <ServiceWorkerRegistration />
         <SessionProvider session={session}>{children}</SessionProvider>
       </body>

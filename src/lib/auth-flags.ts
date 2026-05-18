@@ -44,6 +44,10 @@ export function publicPagesDisabled(): boolean {
   return truthy(process.env.DISABLE_PUBLIC_PAGES)
 }
 
+export function deviceLogsEnabled(): boolean {
+  return truthy(process.env.DEVICE_LOGS_ENABLED)
+}
+
 /**
  * Whether the given email is configured as an extensions admin.
  * Reads `ADMINS` (comma-separated list of emails). Compares case-insensitively.

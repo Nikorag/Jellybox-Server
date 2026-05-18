@@ -17,6 +17,7 @@ const PUBLIC_PATHS = [
   '/api/auth',
   '/api/play',
   '/api/device/me',
+  '/api/device-logs/ingest',
   '/api/health',
 ]
 

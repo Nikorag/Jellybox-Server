@@ -65,6 +65,22 @@ services:
   #     JELLYBOX_BEARER_SECRET: ${JELLYBOX_HA_BEARER_SECRET}
   #     ACCOUNTS_FILE: /data/accounts.json
 
+  # Optional: forwards UDP log broadcasts from Jellybox firmware to the server's
+  # /api/device-logs/ingest so admins can watch logs live in the dashboard.
+  # Needs network_mode: host to receive LAN broadcasts (bridge networking
+  # won't see them). Also requires DEVICE_LOGS_ENABLED=true on the jellybox
+  # service and a matching DEVICE_LOGS_INGEST_TOKEN on both sides.
+  #
+  # jellybox-log-bridge:
+  #   build: ./utils/log-bridge
+  #   restart: unless-stopped
+  #   network_mode: host
+  #   environment:
+  #     JELLYBOX_URL: ${AUTH_URL:-http://localhost:3000}
+  #     INGEST_TOKEN: ${DEVICE_LOGS_INGEST_TOKEN}
+  #     # UDP_PORT: 5514
+  #     # FILTER_IP: 192.168.1.42
+
 volumes:
   jellybox-postgres:
   # jellybox-ha-accounts:

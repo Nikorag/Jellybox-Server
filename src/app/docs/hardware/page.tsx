@@ -289,7 +289,7 @@ export default function HardwarePage() {
         <figure className="my-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
           <Image
             src="/stickers.png"
-            alt="Sticker sheet designer preview — an A4 page laid out with CR80-sized cards, each showing poster artwork and a title, with cut marks between them."
+            alt="A Jellybox device on a child's table next to an open ring-binder folio holding printed children's-book sticker cards, with more cards (Tractor Ted, The Gruffalo, Bluey, Kipper) laid out in front."
             width={1122}
             height={1402}
             sizes="(max-width: 768px) 100vw, 540px"
@@ -297,7 +297,7 @@ export default function HardwarePage() {
             unoptimized
           />
           <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
-            A printable A4 sticker sheet generated from your registered tags.
+            Printed CR80 sticker cards stored in a ring-binder folio — one per tag, ready to scan.
           </figcaption>
         </figure>
 

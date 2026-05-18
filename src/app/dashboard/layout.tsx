@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { getActiveAccountId } from '@/lib/context'
+import { deviceLogsEnabled, isExtensionsAdmin } from '@/lib/auth-flags'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -22,6 +23,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   ])
 
   const partnerAccounts = partnerRows.map((r) => r.owner)
+  const isAdmin = isExtensionsAdmin(session.user.email)
+  const showDeviceLogs = isAdmin && deviceLogsEnabled()
 
   return (
     <div className="flex h-screen bg-jf-bg overflow-hidden">
@@ -33,6 +36,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         selfName={session.user.name ?? null}
         selfEmail={session.user.email ?? ''}
         selfImage={session.user.image ?? null}
+        showDeviceLogs={showDeviceLogs}
       />
 
       {/* Main content area — top padding on mobile clears the fixed top bar (plus iOS status bar) */}

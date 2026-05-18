@@ -154,6 +154,8 @@ cp .env.example .env.local
 | `AUTH_DISABLE_SIGNUP`     | (Optional) Set `true` to disable account creation            | `false`                              |
 | `DISABLE_PUBLIC_PAGES`    | (Optional) Set `true` to hide the landing and docs pages from anonymous users | `false`                              |
 | `ADMINS`                  | (Optional) Comma-separated emails of users allowed to register/remove extensions. Empty/unset = closed | `you@example.com,partner@…`         |
+| `DEVICE_LOGS_ENABLED`     | (Optional) Set `true` to expose the admin-only `/dashboard/device-logs` page and the `/api/device-logs` ingest + SSE endpoints. Pairs with the `utils/log-bridge` companion. | `false`                              |
+| `DEVICE_LOGS_INGEST_TOKEN`| (Optional) Bearer token the log-bridge presents to `/api/device-logs/ingest`. Required when device logs are enabled. | `openssl rand -hex 32`               |
 | `NEXT_DEV_ORIGINS`        | (Dev only) Comma-separated LAN hosts when running `next dev -H 0.0.0.0` so HMR/chunk fetches aren't blocked | `192.168.1.39`                       |
 | `FIRMWARE_REPO`           | (Optional) GitHub `owner/name` of the firmware repo to poll for OTA. Defaults to `Nikorag/Jellybox-Firmware`. Override if you maintain a fork. | `Nikorag/Jellybox-Firmware`          |
 | `FIRMWARE_VERSION`        | (Optional) Pin all devices to a specific firmware tag. Leave unset (or `latest`) to always advertise the newest GitHub release. | `v0.0.2`                             |
