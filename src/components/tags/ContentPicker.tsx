@@ -23,12 +23,14 @@ export default function ContentPicker({
   open,
   onClose,
   onSelect,
+  initialSearch = '',
 }: {
   open: boolean
   onClose: () => void
   onSelect: (item: JellyfinItem) => void
+  initialSearch?: string
 }) {
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch)
   const [typeFilter, setTypeFilter] = useState<string>('')
   const [items, setItems] = useState<JellyfinItem[]>([])
   const [total, setTotal] = useState(0)
@@ -74,14 +76,19 @@ export default function ContentPicker({
     return () => clearTimeout(timer)
   }, [search, typeFilter, open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset on close
+  // Prefill search on open, reset state on close
   useEffect(() => {
-    if (!open) {
+    if (open) {
+      setSearch(initialSearch)
+    } else {
       setSearch('')
       setTypeFilter('')
       setItems([])
       setStartIndex(0)
     }
+    // initialSearch intentionally omitted: only re-seed on open transitions,
+    // not when the parent updates the label while the modal is already open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const hasMore = items.length < total

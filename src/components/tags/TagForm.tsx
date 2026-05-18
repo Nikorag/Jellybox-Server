@@ -424,6 +424,7 @@ export default function TagForm({
       {jellyfinServerUrl && isJellyfinSource && (
         <ContentPicker
           open={pickerOpen}
+          initialSearch={label}
           onClose={() => setPickerOpen(false)}
           onSelect={(item) => {
             setAssignment({ source: 'jellyfin', item })
