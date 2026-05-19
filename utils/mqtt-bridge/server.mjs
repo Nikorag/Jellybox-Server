@@ -1,53 +1,45 @@
 #!/usr/bin/env node
 /**
- * Jellybox MQTT Bridge
+ * Jellybox MQTT Bridge — pull mode
  *
- * Accepts authenticated HTTPS POSTs (typically tunneled from Cloudflare or
- * Tailscale) and forwards them to a local Mosquitto broker over a single
- * long-lived MQTT connection.
- *
- * Endpoints
- *   GET  /healthz                — liveness; returns 200 once connected to MQTT
- *   POST /publish                — single or batch publish (see below)
- *
- * /publish body shapes
- *   { "topic": "x/y", "payload": "...", "retain": true, "qos": 0 }
- *   [ { "topic": "...", "payload": "..." }, ... ]
- *
- * Auth: every request must carry `Authorization: Bearer <BRIDGE_TOKEN>`.
+ * Connects OUTBOUND to a Jellybox server's /api/mqtt/stream SSE endpoint and
+ * republishes each received message to a local Mosquitto broker. Because the
+ * connection is outbound, nothing on the home network needs to be exposed to
+ * the internet — runs happily behind NAT, a residential router, or any
+ * firewall that allows outbound HTTPS.
  *
  * Env vars
- *   BRIDGE_TOKEN     (required)  Shared secret matched against the Bearer header.
- *   MQTT_URL         (required)  e.g. mqtt://mosquitto.local:1883
+ *   JELLYBOX_URL     (required)  Base URL of the Jellybox server,
+ *                                e.g. https://jellybox.example.com
+ *   BRIDGE_TOKEN     (required)  Must match MQTT_BRIDGE_TOKEN on the server.
+ *   MQTT_URL         (required)  Local broker URL, e.g. mqtt://mosquitto:1883
  *   MQTT_USERNAME    (optional)
  *   MQTT_PASSWORD    (optional)
- *   PORT             (default 8080)
- *   HOST             (default 0.0.0.0)
- *   MAX_BODY_BYTES   (default 65536) Reject larger POST bodies.
+ *
+ *   RECONNECT_MIN_MS (default 1000)   Initial reconnect delay (exponential backoff)
+ *   RECONNECT_MAX_MS (default 30000)  Max reconnect delay
  */
-import { createServer } from 'node:http'
 import { connect as mqttConnect } from 'mqtt'
 
 const {
+  JELLYBOX_URL,
   BRIDGE_TOKEN,
   MQTT_URL,
   MQTT_USERNAME,
   MQTT_PASSWORD,
-  PORT = '8080',
-  HOST = '0.0.0.0',
-  MAX_BODY_BYTES = '65536',
+  RECONNECT_MIN_MS = '1000',
+  RECONNECT_MAX_MS = '30000',
 } = process.env
 
-if (!BRIDGE_TOKEN) {
-  console.error('[bridge] BRIDGE_TOKEN is required')
-  process.exit(1)
-}
-if (!MQTT_URL) {
-  console.error('[bridge] MQTT_URL is required')
-  process.exit(1)
+for (const [name, value] of Object.entries({ JELLYBOX_URL, BRIDGE_TOKEN, MQTT_URL })) {
+  if (!value) {
+    console.error(`[bridge] ${name} is required`)
+    process.exit(1)
+  }
 }
 
-const maxBody = Number.parseInt(MAX_BODY_BYTES, 10)
+const reconnectMin = Number.parseInt(RECONNECT_MIN_MS, 10)
+const reconnectMax = Number.parseInt(RECONNECT_MAX_MS, 10)
 
 // ── Long-lived MQTT client ───────────────────────────────────────────────────
 
@@ -58,149 +50,127 @@ const mqttClient = mqttConnect(MQTT_URL, {
   clientId: `jellybox-bridge-${Math.random().toString(16).slice(2, 10)}`,
 })
 
-let mqttReady = false
-mqttClient.on('connect', () => {
-  mqttReady = true
-  console.log(`[bridge] connected to ${MQTT_URL}`)
-})
-mqttClient.on('reconnect', () => console.log('[bridge] reconnecting…'))
-mqttClient.on('close', () => {
-  mqttReady = false
-  console.log('[bridge] disconnected')
-})
+mqttClient.on('connect', () => console.log(`[bridge] mqtt connected to ${MQTT_URL}`))
+mqttClient.on('reconnect', () => console.log('[bridge] mqtt reconnecting…'))
+mqttClient.on('close', () => console.log('[bridge] mqtt disconnected'))
 mqttClient.on('error', (err) => console.error('[bridge] mqtt error:', err.message))
 
-// ── HTTP helpers ────────────────────────────────────────────────────────────
+// ── SSE consumer ─────────────────────────────────────────────────────────────
 
-function send(res, status, body) {
-  const payload =
-    typeof body === 'string' ? body : JSON.stringify(body)
-  res.writeHead(status, {
-    'Content-Type': typeof body === 'string' ? 'text/plain' : 'application/json',
-    'Content-Length': Buffer.byteLength(payload),
-  })
-  res.end(payload)
-}
+const streamUrl = new URL('/api/mqtt/stream', JELLYBOX_URL).toString()
+let backoff = reconnectMin
+let abort
 
-function authorised(req) {
-  const header = req.headers['authorization']
-  if (!header || !header.startsWith('Bearer ')) return false
-  const token = header.slice('Bearer '.length).trim()
-  // Constant-time compare
-  const a = Buffer.from(token)
-  const b = Buffer.from(BRIDGE_TOKEN)
-  if (a.length !== b.length) return false
-  let diff = 0
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i]
-  return diff === 0
-}
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let size = 0
-    const chunks = []
-    req.on('data', (chunk) => {
-      size += chunk.length
-      if (size > maxBody) {
-        reject(new Error('body too large'))
-        req.destroy()
-        return
-      }
-      chunks.push(chunk)
-    })
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
-    req.on('error', reject)
-  })
-}
-
-function normaliseMessages(input) {
-  const list = Array.isArray(input) ? input : [input]
-  return list.map((m) => {
-    if (typeof m !== 'object' || m === null) {
-      throw new Error('each message must be an object')
+function handleEvent(eventName, dataJson) {
+  if (eventName === 'publish') {
+    let msg
+    try {
+      msg = JSON.parse(dataJson)
+    } catch {
+      console.warn('[bridge] malformed publish event')
+      return
     }
-    if (typeof m.topic !== 'string' || m.topic.length === 0) {
-      throw new Error('topic is required')
-    }
-    if (typeof m.payload !== 'string') {
-      throw new Error('payload must be a string')
-    }
-    const qos = m.qos === 1 || m.qos === 2 ? m.qos : 0
-    const retain = m.retain === true
-    return { topic: m.topic, payload: m.payload, qos, retain }
-  })
-}
-
-function publishOne({ topic, payload, qos, retain }) {
-  return new Promise((resolve, reject) => {
-    mqttClient.publish(topic, payload, { qos, retain }, (err) =>
-      err ? reject(err) : resolve(),
+    if (typeof msg?.topic !== 'string' || typeof msg?.payload !== 'string') return
+    mqttClient.publish(
+      msg.topic,
+      msg.payload,
+      { qos: 0, retain: msg.retain === true },
+      (err) => {
+        if (err) console.error('[bridge] publish failed:', err.message)
+      },
     )
-  })
+  } else if (eventName === 'hello') {
+    console.log('[bridge] stream connected')
+  } else if (eventName === 'bye') {
+    console.log('[bridge] server signaled soft-close — will reconnect')
+  }
 }
 
-// ── HTTP server ─────────────────────────────────────────────────────────────
+/**
+ * Read an SSE response body line-by-line and dispatch complete events.
+ * Format: blocks separated by blank lines, with `event:` and `data:` lines.
+ */
+async function consumeStream(res) {
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let eventName = 'message'
+  let dataLines = []
 
-const server = createServer(async (req, res) => {
-  if (req.method === 'GET' && req.url === '/healthz') {
-    return send(res, mqttReady ? 200 : 503, {
-      ok: mqttReady,
-      mqtt: mqttReady ? 'connected' : 'disconnected',
-    })
+  for await (const chunk of res.body) {
+    buffer += decoder.decode(chunk, { stream: true })
+
+    let nlIdx
+    while ((nlIdx = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, nlIdx).replace(/\r$/, '')
+      buffer = buffer.slice(nlIdx + 1)
+
+      if (line === '') {
+        if (dataLines.length > 0) {
+          handleEvent(eventName, dataLines.join('\n'))
+        }
+        eventName = 'message'
+        dataLines = []
+      } else if (line.startsWith(':')) {
+        // Comment / heartbeat — ignore.
+      } else if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim()
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).replace(/^ /, ''))
+      }
+    }
   }
+}
 
-  if (req.method !== 'POST' || req.url !== '/publish') {
-    return send(res, 404, { error: 'not found' })
+async function connectOnce() {
+  abort = new AbortController()
+  const res = await fetch(streamUrl, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${BRIDGE_TOKEN}`,
+      Accept: 'text/event-stream',
+    },
+    signal: abort.signal,
+  })
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`stream returned ${res.status}: ${body.slice(0, 200)}`)
   }
+  if (!res.body) throw new Error('stream has no body')
 
-  if (!authorised(req)) {
-    return send(res, 401, { error: 'unauthorised' })
+  // Reset backoff once we've successfully connected.
+  backoff = reconnectMin
+
+  await consumeStream(res)
+}
+
+async function runForever() {
+  console.log(`[bridge] connecting to ${streamUrl}`)
+  // Eslint complains about while(true); the explicit comment is intentional.
+  for (;;) {
+    try {
+      await connectOnce()
+      console.log('[bridge] stream ended cleanly, reconnecting')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      if (err?.name === 'AbortError') return
+      console.error(`[bridge] stream error: ${msg}; retry in ${backoff}ms`)
+    }
+    await new Promise((r) => setTimeout(r, backoff))
+    backoff = Math.min(backoff * 2, reconnectMax)
   }
-
-  if (!mqttReady) {
-    return send(res, 503, { error: 'mqtt not connected' })
-  }
-
-  let raw
-  try {
-    raw = await readBody(req)
-  } catch (err) {
-    return send(res, 413, { error: err.message })
-  }
-
-  let parsed
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return send(res, 400, { error: 'invalid json' })
-  }
-
-  let messages
-  try {
-    messages = normaliseMessages(parsed)
-  } catch (err) {
-    return send(res, 400, { error: err.message })
-  }
-
-  try {
-    await Promise.all(messages.map(publishOne))
-  } catch (err) {
-    console.error('[bridge] publish failed:', err.message)
-    return send(res, 502, { error: 'publish failed', detail: err.message })
-  }
-
-  return send(res, 200, { ok: true, count: messages.length })
-})
-
-server.listen(Number.parseInt(PORT, 10), HOST, () => {
-  console.log(`[bridge] listening on http://${HOST}:${PORT}`)
-})
+}
 
 function shutdown() {
   console.log('[bridge] shutting down')
-  server.close()
+  if (abort) abort.abort()
   mqttClient.end(false, {}, () => process.exit(0))
   setTimeout(() => process.exit(1), 5_000).unref()
 }
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
+
+runForever().catch((err) => {
+  console.error('[bridge] fatal:', err)
+  process.exit(1)
+})

@@ -1,24 +1,24 @@
 # Jellybox MQTT Bridge
 
-Tiny HTTP→MQTT forwarder. Run it on the same network as your Mosquitto
-broker and Home Assistant. Expose its HTTP port to the internet via
-Cloudflare Tunnel, Tailscale Funnel, or any reverse proxy. The Jellybox
-server (Vercel) then POSTs MQTT messages to it, which the bridge
-republishes to your local broker.
+Outbound-only MQTT relay. Runs on the same LAN as your Mosquitto broker
+and Home Assistant. Connects to the Jellybox server (typically Vercel)
+over an authenticated HTTPS Server-Sent Events stream, receives outbound
+MQTT messages, and republishes them to your local broker.
 
 ```
-Vercel (Jellybox server) ──HTTPS──▶  mqtt-bridge  ──TCP──▶ Mosquitto ──▶ Home Assistant
+Home Assistant ◀── Mosquitto ◀── mqtt-bridge ──HTTPS (outbound only)──▶ Jellybox server (Vercel)
 ```
 
-Why a bridge: opening Mosquitto's TCP port to the public internet is
-inadvisable, and Cloudflare's free tier only proxies HTTP(S)/WS.
-A small HTTPS endpoint with a bearer token tunnels cleanly.
+No inbound ports. No public hostname. Nothing on your home network is
+exposed to the internet. The bridge just needs outbound HTTPS access,
+which any consumer router allows by default.
 
 ## Run with Node
 
 ```bash
 cd utils/mqtt-bridge
 npm install
+JELLYBOX_URL="https://jellybox.example.com" \
 BRIDGE_TOKEN="$(openssl rand -hex 32)" \
 MQTT_URL="mqtt://mosquitto.local:1883" \
 MQTT_USERNAME="jellybox" \
@@ -26,12 +26,16 @@ MQTT_PASSWORD="..." \
 npm start
 ```
 
+Use the same `BRIDGE_TOKEN` value as `MQTT_BRIDGE_TOKEN` on the Jellybox
+server.
+
 ## Run with Docker
 
 ```bash
 docker build -t jellybox-mqtt-bridge utils/mqtt-bridge
-docker run --rm -p 8080:8080 \
-  -e BRIDGE_TOKEN="$(openssl rand -hex 32)" \
+docker run --rm --restart unless-stopped \
+  -e JELLYBOX_URL="https://jellybox.example.com" \
+  -e BRIDGE_TOKEN="..." \
   -e MQTT_URL="mqtt://mosquitto.local:1883" \
   -e MQTT_USERNAME="jellybox" \
   -e MQTT_PASSWORD="..." \
@@ -45,9 +49,8 @@ services:
   mqtt-bridge:
     build: ./utils/mqtt-bridge
     restart: unless-stopped
-    ports:
-      - "8080:8080"
     environment:
+      JELLYBOX_URL: https://jellybox.example.com
       BRIDGE_TOKEN: ${BRIDGE_TOKEN}
       MQTT_URL: mqtt://mosquitto:1883
       MQTT_USERNAME: jellybox
@@ -56,80 +59,48 @@ services:
 
 ## Configuration
 
-| Env var          | Required | Default     | Notes                                       |
-| ---------------- | -------- | ----------- | ------------------------------------------- |
-| `BRIDGE_TOKEN`   | yes      | —           | Shared secret. Sent as `Authorization: Bearer <token>`. Generate with `openssl rand -hex 32`. |
-| `MQTT_URL`       | yes      | —           | Internal broker URL, e.g. `mqtt://mosquitto:1883` |
-| `MQTT_USERNAME`  | no       | —           | Mosquitto credentials                       |
-| `MQTT_PASSWORD`  | no       | —           |                                             |
-| `PORT`           | no       | `8080`      | HTTP listen port                            |
-| `HOST`           | no       | `0.0.0.0`   | Bind address                                |
-| `MAX_BODY_BYTES` | no       | `65536`     | Reject larger POST bodies                   |
+| Env var            | Required | Default     | Notes                                       |
+| ------------------ | -------- | ----------- | ------------------------------------------- |
+| `JELLYBOX_URL`     | yes      | —           | Base URL of the Jellybox server (Vercel deployment) |
+| `BRIDGE_TOKEN`     | yes      | —           | Shared secret; must equal `MQTT_BRIDGE_TOKEN` on the server |
+| `MQTT_URL`         | yes      | —           | Internal broker, e.g. `mqtt://mosquitto:1883` |
+| `MQTT_USERNAME`    | no       | —           | Mosquitto credentials                       |
+| `MQTT_PASSWORD`    | no       | —           |                                             |
+| `RECONNECT_MIN_MS` | no       | `1000`      | Initial backoff after a stream error        |
+| `RECONNECT_MAX_MS` | no       | `30000`     | Backoff cap                                 |
 
-## HTTP API
+## How it works
 
-### `GET /healthz`
-
-Returns `200 { ok: true, mqtt: "connected" }` once the bridge has linked to the
-broker, `503` otherwise. Useful for tunnel/uptime health checks.
-
-### `POST /publish`
-
-Auth required. Body is a single message object or an array of messages:
-
-```json
-{ "topic": "jellybox/device/abc/last_seen", "payload": "2026-05-19T18:00:00Z", "retain": true, "qos": 0 }
-```
-
-```json
-[
-  { "topic": "homeassistant/sensor/.../config", "payload": "{...}", "retain": true },
-  { "topic": "jellybox/.../state", "payload": "...", "retain": true }
-]
-```
-
-Responses:
-- `200 { ok: true, count: N }` — all messages published
-- `400` — bad JSON or schema
-- `401` — missing/wrong bearer token
-- `413` — body exceeds `MAX_BODY_BYTES`
-- `502` — MQTT publish failed
-- `503` — bridge has not connected to MQTT yet
-
-## Exposing to the internet
-
-### Cloudflare Tunnel
-
-```bash
-cloudflared tunnel --hostname mqtt-bridge.example.com --url http://localhost:8080
-```
-
-Then set in Vercel:
-
-```
-MQTT_URL=https://mqtt-bridge.example.com
-MQTT_BRIDGE_TOKEN=<same value as BRIDGE_TOKEN>
-```
-
-### Tailscale Funnel
-
-```bash
-tailscale serve --bg --https=443 http://localhost:8080
-tailscale funnel 443 on
-```
-
-Use the resulting `https://<machine>.ts.net` URL as `MQTT_URL` in Vercel.
+1. The bridge opens an HTTPS connection to
+   `${JELLYBOX_URL}/api/mqtt/stream` with `Authorization: Bearer <BRIDGE_TOKEN>`.
+2. The server holds the connection open as a Server-Sent Events stream
+   and sends one `event: publish` per outbound MQTT message.
+3. The bridge republishes each message to local Mosquitto over a single
+   long-lived MQTT connection.
+4. Vercel Functions have a 300 s execution cap. The server emits a soft
+   `bye` a few seconds before that and the bridge reconnects.
+   Exponential backoff (1 s → 30 s) handles broker / network blips.
 
 ## Configuring the Jellybox server
 
-In `apps/server/.env.local` (or Vercel project settings):
+On Vercel (or wherever the server runs), set:
 
 ```
-MQTT_URL=https://mqtt-bridge.example.com
-MQTT_BRIDGE_TOKEN=<BRIDGE_TOKEN value>
+MQTT_BRIDGE_TOKEN=<same value as BRIDGE_TOKEN>
 ```
 
-When `MQTT_URL` begins with `http://` or `https://`, the server speaks
-HTTP to the bridge. When it begins with `mqtt://`, `mqtts://`, `ws://`,
-or `wss://`, the server connects directly to a broker (useful if your
-broker is on Tailscale and reachable by hostname without a bridge).
+Leave `MQTT_URL` unset on the server — its presence would switch the
+server into direct-MQTT mode. When `MQTT_BRIDGE_TOKEN` is set on its
+own, every MQTT publish gets queued on an internal bus that the SSE
+stream drains for the connected bridge.
+
+## Health / debugging
+
+- `GET ${JELLYBOX_URL}/api/mqtt/stream` returns `401` without auth and
+  `404` when bridge mode is disabled — useful for verifying the server
+  side of the config from outside.
+- The bridge logs `[bridge] stream connected` once the SSE handshake
+  completes, `[bridge] mqtt connected to …` once Mosquitto accepts it,
+  and a line per publish failure.
+- Reconnect on every Vercel 300 s soft-close is expected and prints a
+  `server signaled soft-close — will reconnect` line — not an error.
