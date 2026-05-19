@@ -16,9 +16,13 @@ jest.mock('@/lib/crypto', () => ({
   verifySecret: jest.fn(),
 }))
 
-jest.mock('@/lib/firmware-manifest', () => ({
-  getFirmwareManifest: jest.fn(),
-}))
+jest.mock('@/lib/firmware-manifest', () => {
+  const actual = jest.requireActual('@/lib/firmware-manifest')
+  return {
+    ...actual,
+    getFirmwareManifest: jest.fn(),
+  }
+})
 
 const { db } = jest.requireMock('@/lib/db')
 const { verifySecret } = jest.requireMock('@/lib/crypto')
@@ -31,6 +35,9 @@ const mockDevice = {
   apiKeyPrefix: 'jb_testkey',
   scanModeToken: null,
   scanModeExpiresAt: null,
+  firmwareUpdatePending: false,
+  firmwareVersion: null,
+  sku: 'jb-eink-v1',
 }
 
 function makeRequest(apiKey?: string) {
@@ -70,14 +77,19 @@ describe('GET /api/device/me', () => {
     expect(body).not.toHaveProperty('latestFirmware')
   })
 
-  it('includes latestFirmware (version + url only) when the manifest is cached', async () => {
-    db.device.findMany.mockResolvedValue([mockDevice])
+  it('includes latestFirmware (version + url only) when an update is pending and the manifest is cached', async () => {
+    db.device.findMany.mockResolvedValue([{ ...mockDevice, firmwareUpdatePending: true }])
     verifySecret.mockResolvedValue(true)
     getFirmwareManifest.mockResolvedValue({
       version: 'v0.0.2',
-      url: 'https://example.com/jellybox-firmware-v0.0.2.bin',
-      chipFamily: 'ESP32',
-      mergedUrl: 'https://example.com/jellybox-firmware-v0.0.2-merged.bin',
+      builds: [
+        {
+          sku: 'jb-eink-v1',
+          url: 'https://example.com/jellybox-firmware-v0.0.2.bin',
+          chipFamily: 'ESP32',
+          mergedUrl: 'https://example.com/jellybox-firmware-v0.0.2-merged.bin',
+        },
+      ],
     })
 
     const res = await GET(makeRequest('jb_validkey1234567890'))

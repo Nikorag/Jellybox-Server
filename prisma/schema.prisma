@@ -224,6 +224,10 @@ model Device {
   /// Display-only snapshot of the Jellyfin user name at the time of selection.
   defaultJellyfinUserName String?
   lastSeenAt      DateTime?
+  /// Hardware variant identifier — see src/lib/skus.ts. Reported by the
+  /// firmware on each bootstrap; defaults to the original eInk board for
+  /// historical devices that pre-date SKU reporting.
+  sku             String    @default("jb-eink-v1")
   firmwareVersion String?
   /// When true, the next /api/device/me poll returns the latest firmware
   /// manifest, prompting an OTA. Cleared automatically once the device

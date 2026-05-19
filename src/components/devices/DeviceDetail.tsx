@@ -10,6 +10,7 @@ import {
   setFirmwareUpdatePendingAction,
 } from '@/app/dashboard/devices/actions'
 import { formatRelativeTime, formatDate } from '@/lib/utils'
+import { getSku } from '@/lib/skus'
 
 type DeviceWithClient = Device & { defaultClient: JellyfinClient | null }
 
@@ -143,6 +144,17 @@ export default function DeviceDetail({
               {device.lastSeenAt ? formatRelativeTime(device.lastSeenAt) : 'Never'}
             </span>
           </div>
+          {(() => {
+            const sku = getSku(device.sku)
+            return (
+              <div className="flex justify-between">
+                <span className="text-jf-text-muted">Hardware</span>
+                <span className="text-jf-text-primary">
+                  {sku ? sku.displayName : device.sku}
+                </span>
+              </div>
+            )
+          })()}
           {device.firmwareVersion && (
             <div className="flex justify-between">
               <span className="text-jf-text-muted">Firmware</span>

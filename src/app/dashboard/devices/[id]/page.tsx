@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { getActiveAccountId } from '@/lib/context'
 import { PageHeader } from '@/components/ui'
 import DeviceDetail from '@/components/devices/DeviceDetail'
-import { getFirmwareManifest } from '@/lib/firmware-manifest'
+import { getFirmwareManifest, selectBuild } from '@/lib/firmware-manifest'
 import { decrypt } from '@/lib/crypto'
 import { jellyfinGetUsers } from '@/lib/jellyfin'
 
@@ -44,7 +44,10 @@ export default async function DevicePage({ params }: { params: Promise<{ id: str
   }
 
   const manifest = await getFirmwareManifest()
-  const latestFirmwareVersion = manifest?.version ?? null
+  const build = selectBuild(manifest, device.sku)
+  // Only surface a latest-version pointer if there's actually a build for this
+  // device's SKU. Otherwise the dashboard would offer an OTA we can't deliver.
+  const latestFirmwareVersion = manifest && build ? manifest.version : null
 
   return (
     <div>

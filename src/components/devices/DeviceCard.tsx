@@ -4,10 +4,12 @@ import Link from 'next/link'
 import type { Device, JellyfinClient } from '@prisma/client'
 import { Card, CardContent, Badge, Button } from '@/components/ui'
 import { formatRelativeTime } from '@/lib/utils'
+import { getSku } from '@/lib/skus'
 
 type DeviceWithClient = Device & { defaultClient: JellyfinClient | null }
 
 export default function DeviceCard({ device }: { device: DeviceWithClient }) {
+  const sku = getSku(device.sku)
   return (
     <Card>
       <CardContent className="flex items-center justify-between gap-4">
@@ -29,6 +31,11 @@ export default function DeviceCard({ device }: { device: DeviceWithClient }) {
         </div>
 
         <div className="flex items-center gap-3 flex-shrink-0">
+          {sku && (
+            <Badge variant="neutral" className="hidden sm:inline-flex" title={sku.displayName}>
+              {sku.shortName}
+            </Badge>
+          )}
           {device.defaultJellyfinUserId ? (
             <Badge variant="neutral" className="hidden sm:inline-flex">
               {device.defaultJellyfinUserName ?? 'Jellyfin user'}

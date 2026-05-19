@@ -1,14 +1,18 @@
 'use client'
 
 import Script from 'next/script'
-import type { CSSProperties, DetailedHTMLProps, HTMLAttributes } from 'react'
+import { useState, type CSSProperties, type DetailedHTMLProps, type HTMLAttributes } from 'react'
+import type { Sku, SkuId } from '@/lib/skus'
 
 /**
  * The ESP Web Tools install button is a Web Component (`<esp-web-install-button>`)
  * loaded as an ES module from unpkg. It only works in Chromium-based browsers over
  * HTTPS (or localhost) because it relies on the Web Serial API. The manifest URL
  * points at /api/firmware/web-tools-manifest.json on this server, which derives
- * an ESP Web Tools manifest from the cached firmware release info.
+ * an ESP Web Tools manifest from the cached firmware release info for a given SKU.
+ *
+ * A blank device can't tell us which hardware variant it is, so the user picks
+ * a SKU from the dropdown before flashing.
  */
 
 declare module 'react' {
@@ -23,21 +27,43 @@ declare module 'react' {
 }
 
 const buttonStyle: CSSProperties = {
-  // ESP Web Tools styles its slotted button via CSS custom properties.
   ['--esp-tools-button-color' as string]: 'white',
   ['--esp-tools-button-text-color' as string]: '#0b0d12',
   ['--esp-tools-button-border-radius' as string]: '0.5rem',
 }
 
-export default function WebFlasher() {
+export default function WebFlasher({ skus, defaultSku }: { skus: readonly Sku[]; defaultSku: SkuId }) {
+  const [selectedSku, setSelectedSku] = useState<string>(defaultSku)
+  const manifestUrl = `/api/firmware/web-tools-manifest.json?sku=${encodeURIComponent(selectedSku)}`
+  const selected = skus.find((s) => s.id === selectedSku) ?? skus.find((s) => s.id === defaultSku)
+
   return (
-    <div className="not-prose flex flex-col gap-2" style={buttonStyle}>
+    <div className="not-prose flex flex-col gap-3" style={buttonStyle}>
       <Script
         type="module"
         src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"
         strategy="afterInteractive"
       />
-      <esp-web-install-button manifest="/api/firmware/web-tools-manifest.json">
+
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium text-jf-text-primary">Hardware variant</span>
+        <select
+          value={selectedSku}
+          onChange={(e) => setSelectedSku(e.target.value)}
+          className="rounded-lg border border-jf-border bg-jf-elevated px-3 py-2 text-jf-text-primary focus:outline-none focus:ring-2 focus:ring-jf-primary/40"
+        >
+          {skus.map((sku) => (
+            <option key={sku.id} value={sku.id}>
+              {sku.displayName}
+            </option>
+          ))}
+        </select>
+        {selected && (
+          <span className="text-xs text-jf-text-muted">{selected.description}</span>
+        )}
+      </label>
+
+      <esp-web-install-button key={selectedSku} manifest={manifestUrl}>
         <button
           slot="activate"
           className="inline-flex items-center justify-center rounded-lg bg-jf-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition-opacity"

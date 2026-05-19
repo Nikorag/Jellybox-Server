@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { verifySecret } from '@/lib/crypto'
-import { getFirmwareManifest } from '@/lib/firmware-manifest'
+import { getFirmwareManifest, selectBuild } from '@/lib/firmware-manifest'
+import { DEFAULT_SKU, isKnownSku } from '@/lib/skus'
 
 /**
  * GET /api/device/me
@@ -10,6 +11,7 @@ import { getFirmwareManifest } from '@/lib/firmware-manifest'
  * and fetch its display configuration for the eInk screen.
  *
  * Auth: Authorization: Bearer jb_<key>
+ * Query: ?version=<firmwareVersion>&sku=<skuId>
  *
  * 200 { name, scanMode, latestFirmware? }
  * 401 missing or invalid key — device should show "Unpaired" on eInk
@@ -39,7 +41,26 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Invalid or revoked API key.' }, { status: 401 })
   }
 
-  const reportedVersion = new URL(req.url).searchParams.get('version')?.trim() || null
+  const url = new URL(req.url)
+  const reportedVersion = url.searchParams.get('version')?.trim() || null
+  const reportedSku = url.searchParams.get('sku')?.trim() || null
+
+  // Persist the SKU on first contact (stored default is jb-eink-v1 from the
+  // schema). Only adopt a reported value if it's known; log a warning when a
+  // device reports a SKU that disagrees with what's stored — that's a sign of
+  // a misflashed device and shouldn't silently overwrite.
+  let nextSku: string | undefined
+  if (reportedSku && isKnownSku(reportedSku)) {
+    if (device.sku === DEFAULT_SKU && reportedSku !== device.sku) {
+      nextSku = reportedSku
+    } else if (reportedSku !== device.sku) {
+      console.warn(
+        `[device/me] device ${device.id} reports sku=${reportedSku} but DB has ${device.sku}; ignoring.`,
+      )
+    }
+  }
+
+  const skuForOta = nextSku ?? device.sku
 
   const scanMode =
     !!device.scanModeToken &&
@@ -54,11 +75,12 @@ export async function GET(req: Request) {
 
   if (device.firmwareUpdatePending) {
     const manifest = await getFirmwareManifest()
-    if (manifest) {
+    const build = selectBuild(manifest, skuForOta)
+    if (manifest && build) {
       if (reportedVersion && reportedVersion === manifest.version) {
         clearPending = true
       } else {
-        latestFirmware = { version: manifest.version, url: manifest.url }
+        latestFirmware = { version: manifest.version, url: build.url }
       }
     }
   }
@@ -70,6 +92,7 @@ export async function GET(req: Request) {
       ...(reportedVersion && reportedVersion !== device.firmwareVersion
         ? { firmwareVersion: reportedVersion }
         : {}),
+      ...(nextSku ? { sku: nextSku } : {}),
       ...(clearPending ? { firmwareUpdatePending: false } : {}),
     },
   })

@@ -1,7 +1,12 @@
 /**
  * @jest-environment node
  */
-import { fetchFirmwareManifest, getFirmwareManifestUrl } from '@/lib/firmware-manifest'
+import {
+  fetchFirmwareManifest,
+  getFirmwareManifestUrl,
+  selectBuild,
+  type FirmwareManifest,
+} from '@/lib/firmware-manifest'
 
 const originalFetch = global.fetch
 const originalConsoleError = console.error
@@ -36,7 +41,7 @@ afterAll(() => {
 })
 
 describe('fetchFirmwareManifest', () => {
-  it('returns a parsed manifest from a valid response', async () => {
+  it('wraps a legacy flat manifest as a single jb-eink-v1 build', async () => {
     mockFetchOnce(() =>
       jsonResponse({
         version: 'v0.0.2',
@@ -50,7 +55,12 @@ describe('fetchFirmwareManifest', () => {
     const result = await fetchFirmwareManifest()
     expect(result).toEqual({
       version: 'v0.0.2',
-      url: 'https://example.com/firmware-v0.0.2.bin',
+      builds: [
+        {
+          sku: 'jb-eink-v1',
+          url: 'https://example.com/firmware-v0.0.2.bin',
+        },
+      ],
     })
     expect(global.fetch).toHaveBeenCalledWith(
       'https://github.com/Nikorag/Jellybox-Firmware/releases/latest/download/manifest.json',
@@ -58,7 +68,7 @@ describe('fetchFirmwareManifest', () => {
     )
   })
 
-  it('passes chipFamily and mergedUrl through when present', async () => {
+  it('passes chipFamily and mergedUrl through on legacy manifests', async () => {
     mockFetchOnce(() =>
       jsonResponse({
         version: 'v3.0.0',
@@ -70,30 +80,88 @@ describe('fetchFirmwareManifest', () => {
 
     expect(await fetchFirmwareManifest()).toEqual({
       version: 'v3.0.0',
-      url: 'https://example.com/jellybox-firmware-v3.0.0.bin',
-      chipFamily: 'ESP32',
-      mergedUrl: 'https://example.com/jellybox-firmware-v3.0.0-merged.bin',
+      builds: [
+        {
+          sku: 'jb-eink-v1',
+          url: 'https://example.com/jellybox-firmware-v3.0.0.bin',
+          chipFamily: 'ESP32',
+          mergedUrl: 'https://example.com/jellybox-firmware-v3.0.0-merged.bin',
+        },
+      ],
     })
   })
 
-  it('strips informational fields it does not understand', async () => {
+  it('parses a new builds[] manifest', async () => {
     mockFetchOnce(() =>
       jsonResponse({
-        version: 'v1.2.3',
-        url: 'https://example.com/fw.bin',
-        sha256: 'deadbeef',
-        size: 999,
-        released_at: '2026-05-03T20:00:00Z',
+        version: 'v0.2.0',
+        released_at: '2026-06-01T00:00:00Z',
+        builds: [
+          {
+            sku: 'jb-eink-v1',
+            chipFamily: 'ESP32',
+            url: 'https://example.com/fw-jb-eink-v1-v0.2.0.bin',
+            mergedUrl: 'https://example.com/fw-jb-eink-v1-v0.2.0.merged.bin',
+            sha256: 'aaa',
+            size: 100,
+          },
+          {
+            sku: 'jb-future-v1',
+            chipFamily: 'ESP32',
+            url: 'https://example.com/fw-jb-future-v1-v0.2.0.bin',
+          },
+        ],
       }),
     )
 
     expect(await fetchFirmwareManifest()).toEqual({
-      version: 'v1.2.3',
-      url: 'https://example.com/fw.bin',
+      version: 'v0.2.0',
+      builds: [
+        {
+          sku: 'jb-eink-v1',
+          chipFamily: 'ESP32',
+          url: 'https://example.com/fw-jb-eink-v1-v0.2.0.bin',
+          mergedUrl: 'https://example.com/fw-jb-eink-v1-v0.2.0.merged.bin',
+        },
+        {
+          sku: 'jb-future-v1',
+          chipFamily: 'ESP32',
+          url: 'https://example.com/fw-jb-future-v1-v0.2.0.bin',
+        },
+      ],
     })
   })
 
-  it('ignores chipFamily and mergedUrl when they are not strings', async () => {
+  it('ignores invalid entries in builds[] but returns the valid ones', async () => {
+    mockFetchOnce(() =>
+      jsonResponse({
+        version: 'v0.2.0',
+        builds: [
+          { sku: 'jb-eink-v1', url: 'https://example.com/ok.bin' },
+          { sku: 'no-url' },
+          'not an object',
+          null,
+        ],
+      }),
+    )
+
+    expect(await fetchFirmwareManifest()).toEqual({
+      version: 'v0.2.0',
+      builds: [{ sku: 'jb-eink-v1', url: 'https://example.com/ok.bin' }],
+    })
+  })
+
+  it('returns null when builds[] is present but empty after filtering', async () => {
+    mockFetchOnce(() =>
+      jsonResponse({
+        version: 'v0.2.0',
+        builds: [{ sku: 42 }, 'nope'],
+      }),
+    )
+    expect(await fetchFirmwareManifest()).toBeNull()
+  })
+
+  it('ignores chipFamily and mergedUrl when they are not strings (legacy)', async () => {
     mockFetchOnce(() =>
       jsonResponse({
         version: 'v1.2.3',
@@ -105,7 +173,7 @@ describe('fetchFirmwareManifest', () => {
 
     expect(await fetchFirmwareManifest()).toEqual({
       version: 'v1.2.3',
-      url: 'https://example.com/fw.bin',
+      builds: [{ sku: 'jb-eink-v1', url: 'https://example.com/fw.bin' }],
     })
   })
 
@@ -119,8 +187,13 @@ describe('fetchFirmwareManifest', () => {
     expect(await fetchFirmwareManifest()).toBeNull()
   })
 
-  it('returns null when required fields are missing', async () => {
+  it('returns null when version is missing', async () => {
     mockFetchOnce(() => jsonResponse({ url: 'https://example.com/a.bin' }))
+    expect(await fetchFirmwareManifest()).toBeNull()
+  })
+
+  it('returns null when neither builds[] nor url is present', async () => {
+    mockFetchOnce(() => jsonResponse({ version: 'v1.0.0' }))
     expect(await fetchFirmwareManifest()).toBeNull()
   })
 
@@ -164,5 +237,31 @@ describe('getFirmwareManifestUrl', () => {
     expect(getFirmwareManifestUrl()).toBe(
       'https://github.com/Nikorag/Jellybox-Firmware/releases/latest/download/manifest.json',
     )
+  })
+})
+
+describe('selectBuild', () => {
+  const manifest: FirmwareManifest = {
+    version: 'v0.2.0',
+    builds: [
+      { sku: 'jb-eink-v1', url: 'https://example.com/eink.bin' },
+      // @ts-expect-error — exercising an unknown SKU at runtime
+      { sku: 'jb-future-v1', url: 'https://example.com/future.bin' },
+    ],
+  }
+
+  it('returns the build matching the SKU', () => {
+    expect(selectBuild(manifest, 'jb-eink-v1')).toEqual({
+      sku: 'jb-eink-v1',
+      url: 'https://example.com/eink.bin',
+    })
+  })
+
+  it('returns null when no build matches', () => {
+    expect(selectBuild(manifest, 'jb-missing-v1')).toBeNull()
+  })
+
+  it('returns null when manifest is null', () => {
+    expect(selectBuild(null, 'jb-eink-v1')).toBeNull()
   })
 })

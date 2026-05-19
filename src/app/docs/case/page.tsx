@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import StlModelViewerLoader from '@/components/docs/StlModelViewerLoader'
+import { getSku } from '@/lib/skus'
+
+const SKU = getSku('jb-eink-v1')
 
 export const metadata: Metadata = { title: 'Case & STL Files — Jellybox Docs' }
 
@@ -18,6 +21,10 @@ export default function CasePage() {
           A 3D-printable enclosure designed to fit the ESP32 dev board, Waveshare 2.9&quot; eInk
           display, PN532 NFC module, and 12-LED NeoPixel ring.
         </p>
+        <div className="mt-5 rounded-lg border border-jf-primary/30 bg-jf-primary-muted px-4 py-3 text-sm leading-relaxed text-jf-text-secondary">
+          <strong className="text-jf-text-primary">{SKU.displayName}</strong> (<code className="font-mono text-xs">{SKU.id}</code>).
+          These STLs fit this hardware variant only — other Jellybox SKUs need different enclosures.
+        </div>
         <a
           href="https://www.tinkercad.com/things/9veK57fYtEN-jellybox-case?sharecode=Kz9MUFZP3gR27f36WOPv8fyj_9rZoQ1cSTjR1Jlf0dc"
           target="_blank"

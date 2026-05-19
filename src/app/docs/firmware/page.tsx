@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import WebFlasher from './WebFlasher'
+import { SKUS, DEFAULT_SKU } from '@/lib/skus'
 
 export const metadata: Metadata = { title: 'Flash the Firmware — Jellybox Docs' }
 
@@ -95,7 +96,7 @@ export default function FirmwarePage() {
           device. The latest released firmware will be downloaded and flashed in one step. After the
           flash completes, head to <em>step 7 — first-time setup</em> below.
         </p>
-        <WebFlasher />
+        <WebFlasher skus={SKUS} defaultSku={DEFAULT_SKU} />
         <p className="text-xs text-jf-text-muted mt-4 leading-relaxed">
           Requires a Chromium-based browser (Chrome, Edge, Opera, Arc) on desktop. Firefox and
           Safari don&apos;t implement Web Serial. If the button stays disabled, check that you&apos;re

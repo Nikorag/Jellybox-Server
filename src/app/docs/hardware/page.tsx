@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+import { getSku } from '@/lib/skus'
+
+const SKU = getSku('jb-eink-v1')
 
 export const metadata: Metadata = { title: 'Components & Wiring — Jellybox Docs' }
 
@@ -120,6 +123,12 @@ export default function HardwarePage() {
           Everything you need to build a Jellybox device from scratch. The hardware is intentionally
           simple: an ESP32, an NFC reader, an eInk screen, and some LEDs.
         </p>
+
+        <div className="mt-5 rounded-lg border border-jf-primary/30 bg-jf-primary-muted px-4 py-3 text-sm leading-relaxed text-jf-text-secondary">
+          <strong className="text-jf-text-primary">{SKU.displayName}</strong> (<code className="font-mono text-xs">{SKU.id}</code>).
+          These instructions apply to this hardware variant only — other Jellybox SKUs use different
+          displays, pinouts, and peripherals.
+        </div>
 
         <figure className="mt-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
           <Image
