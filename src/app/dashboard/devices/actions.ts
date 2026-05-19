@@ -6,6 +6,7 @@ import { auth } from '@/auth'
 import { db } from '@/lib/db'
 import { generateDeviceApiKey } from '@/lib/crypto'
 import { getActiveAccountId } from '@/lib/context'
+import { publishDeviceDiscovery, publishDeviceRemoval } from '@/lib/mqtt'
 
 const createDeviceSchema = z.object({
   name: z.string().min(1, 'Device name is required').max(64),
@@ -45,6 +46,8 @@ export async function createDeviceAction(
       apiKeyPrefix: prefix,
     },
   })
+
+  void publishDeviceDiscovery({ id: device.id, name: device.name })
 
   revalidatePath('/dashboard/devices')
   return { rawKey, deviceId: device.id }
@@ -110,6 +113,10 @@ export async function updateDeviceAction(
     },
   })
 
+  if (parsed.data.name !== undefined) {
+    void publishDeviceDiscovery({ id: deviceId, name: parsed.data.name })
+  }
+
   revalidatePath('/dashboard/devices')
   revalidatePath(`/dashboard/devices/${deviceId}`)
   return {}
@@ -145,6 +152,8 @@ export async function deleteDeviceAction(
   await db.device.deleteMany({
     where: { id: deviceId, userId: accountId },
   })
+
+  void publishDeviceRemoval(deviceId)
 
   revalidatePath('/dashboard/devices')
   return {}

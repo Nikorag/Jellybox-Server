@@ -25,6 +25,12 @@ const sections = [
     ],
   },
   {
+    label: 'Integrations',
+    items: [
+      { href: '/docs/home-assistant', label: 'Home Assistant (MQTT)' },
+    ],
+  },
+  {
     label: 'Hardware',
     items: [
       { href: '/docs/hardware', label: 'Components & wiring' },
