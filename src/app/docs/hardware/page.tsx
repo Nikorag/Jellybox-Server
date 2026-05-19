@@ -5,6 +5,10 @@ import { getSku } from '@/lib/skus'
 
 const SKU = getSku('jb-eink-v1')
 
+// PCB resources — set these when the listing and design repo go live.
+const PCB_TINDIE_URL = '' // e.g. 'https://www.tindie.com/products/.../'
+const PCB_DESIGN_URL = '' // e.g. 'https://github.com/.../jellybox-pcb'
+
 export const metadata: Metadata = { title: 'Components & Wiring — Jellybox Docs' }
 
 function SectionHeader({ title, description }: { title: string; description?: string }) {
@@ -173,6 +177,119 @@ export default function HardwarePage() {
             </tbody>
           </table>
         </div>
+      </section>
+
+      {/* Custom PCB */}
+      <section className="mb-10">
+        <SectionHeader
+          title="Custom PCB"
+          description="Skip the breadboard — a drop-in PCB designed to fit the ESP32 dev board, PN532, eInk display, and NeoPixel ring."
+        />
+
+        <p className="text-sm text-jf-text-secondary leading-relaxed mb-4">
+          The custom Jellybox PCB routes every connection from the Wiring section
+          onto a single board. Headers are pre-placed for the standard ESP32 dev
+          module, PN532 breakout, Waveshare 2.9″ eInk display, and 16-LED
+          NeoPixel ring, and the TP4056 charger + power switch from the Power
+          section have their own footprints — solder the modules in, fit a
+          battery, done.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <figure className="rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
+            <Image
+              src="/pcb.jpeg"
+              alt="Assembled Jellybox PCB with ESP32, PN532 NFC reader, eInk display, and NeoPixel ring fitted."
+              width={1600}
+              height={1200}
+              sizes="(max-width: 768px) 100vw, 360px"
+              className="w-full h-auto"
+              unoptimized
+            />
+            <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
+              Assembled Jellybox PCB with modules fitted.
+            </figcaption>
+          </figure>
+          <figure className="rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
+            <Image
+              src="/schematic.jpeg"
+              alt="Schematic of the Jellybox custom PCB."
+              width={1600}
+              height={1200}
+              sizes="(max-width: 768px) 100vw, 360px"
+              className="w-full h-auto"
+              unoptimized
+            />
+            <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
+              Schematic — see the design files for the editable source.
+            </figcaption>
+          </figure>
+        </div>
+
+        <div className="flex flex-wrap gap-3 mb-4">
+          {PCB_TINDIE_URL ? (
+            <a
+              href={PCB_TINDIE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-jf-primary text-white text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Buy on Tindie
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          ) : (
+            <span
+              aria-disabled="true"
+              title="Link coming soon"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-jf-elevated border border-jf-border text-jf-text-muted text-sm font-medium opacity-60 cursor-not-allowed select-none"
+            >
+              Buy on Tindie
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </span>
+          )}
+          {PCB_DESIGN_URL ? (
+            <a
+              href={PCB_DESIGN_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-primary text-sm font-medium hover:border-jf-primary/50 transition-colors"
+            >
+              Design files
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </a>
+          ) : (
+            <span
+              aria-disabled="true"
+              title="Link coming soon"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-muted text-sm font-medium opacity-60 cursor-not-allowed select-none"
+            >
+              Design files
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </span>
+          )}
+        </div>
+
+        <Callout>
+          This PCB fits the <strong className="text-jf-text-primary">{SKU.displayName}</strong>{' '}
+          (<code className="font-mono text-xs">{SKU.id}</code>) build only — other Jellybox SKUs
+          use different displays and peripherals and will need their own boards.
+        </Callout>
+
+        <p className="text-xs text-jf-text-muted mt-3">
+          No PCB? See the hand-wired pinout below.
+        </p>
       </section>
 
       {/* Wiring */}
