@@ -322,6 +322,35 @@ export default function FirmwarePage() {
         </div>
       </section>
 
+      {/* Device log streaming */}
+      <section id="device-log-streaming" className="mt-4 mb-10 scroll-mt-24">
+        <h2 className="text-lg font-semibold text-jf-text-primary mb-3">Device log streaming</h2>
+        <div className="space-y-3 text-sm text-jf-text-secondary leading-relaxed">
+          <p>
+            While running, every Jellybox device broadcasts its serial-style log output over the
+            LAN as UDP packets to <Code>255.255.255.255:5514</Code>. Each packet is one line —{' '}
+            <Code>{`<millis> <message>`}</Code> — so you can watch a device&apos;s internal state
+            without a USB cable, even after it&apos;s sealed inside its case.
+          </p>
+          <p>
+            For a quick local tail from a machine on the same network, run{' '}
+            <Code>npm run logs:device</Code> from inside <Code>apps/server</Code>. To stream logs
+            into the dashboard at <Code>/dashboard/device-logs</Code> instead — useful when the
+            server is hosted on Vercel and can&apos;t see LAN broadcasts directly — you need to
+            run the log bridge. See{' '}
+            <Link href="/docs/server#log-bridge" className="text-jf-primary hover:underline">
+              Device log bridge
+            </Link>{' '}
+            on the server guide for setup.
+          </p>
+          <p>
+            If your access point filters broadcast traffic (some mesh and guest networks do), edit{' '}
+            <Code>UDP_LOG_HOST</Code> in <Code>Config.h</Code> to the unicast IP of the bridge
+            machine and reflash.
+          </p>
+        </div>
+      </section>
+
       {/* LED reference */}
       <section className="mt-4 mb-8">
         <h2 className="text-lg font-semibold text-jf-text-primary mb-3">LED state reference</h2>

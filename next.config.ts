@@ -42,6 +42,9 @@ const nextConfig: NextConfig = {
       {
         pathname: '/stickers.png',
       },
+      {
+        pathname: '/screens/**',
+      },
     ],
     remotePatterns: [
       // Allow Jellyfin server images — patterns are added at runtime via env

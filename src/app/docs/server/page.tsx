@@ -294,6 +294,103 @@ npm run db:migrate`}</CodeBlock>
           </p>
         </Step>
       </div>
+
+      {/* Device log bridge */}
+      <section id="log-bridge" className="mt-4 mb-10 scroll-mt-24">
+        <h2 className="text-lg font-semibold text-jf-text-primary mb-3">Device log bridge</h2>
+        <div className="space-y-3 text-sm text-jf-text-secondary leading-relaxed">
+          <p>
+            Jellybox firmware broadcasts its log output over the LAN as UDP packets — see{' '}
+            <Link href="/docs/firmware#device-log-streaming" className="text-jf-primary hover:underline">
+              Device log streaming
+            </Link>{' '}
+            on the firmware page for the wire format. UDP broadcasts don&apos;t leave the local
+            network segment, so a Vercel-hosted (or otherwise remote) server can&apos;t see them
+            directly. The <strong className="text-jf-text-primary">log bridge</strong> is a small
+            Node process that listens for those broadcasts and forwards each line over HTTPS to the
+            server&apos;s ingest endpoint, where any admin watching{' '}
+            <Code>/dashboard/device-logs</Code> sees them appear live over SSE. Nothing is
+            persisted — the server just fans lines out to connected viewers.
+          </p>
+          <p>
+            Source and Dockerfile live in <Code>apps/server/utils/log-bridge/</Code>.
+          </p>
+
+          <h3 className="text-sm font-semibold text-jf-text-primary pt-2">1. Turn the feature on</h3>
+          <p>Add these to your server environment:</p>
+          <div className="space-y-2">
+            <EnvVar
+              name="DEVICE_LOGS_ENABLED"
+              description="Exposes the ingest endpoint and the admin-only Device logs page."
+              example="true"
+            />
+            <EnvVar
+              name="DEVICE_LOGS_INGEST_TOKEN"
+              description="Long random bearer token. The bridge must send this on every POST."
+            />
+            <EnvVar
+              name="ADMINS"
+              description="Comma-separated emails allowed to view device logs. The nav entry is hidden for everyone else."
+              example="you@example.com"
+            />
+          </div>
+
+          <h3 className="text-sm font-semibold text-jf-text-primary pt-2">2. Run the bridge on your LAN</h3>
+          <p>
+            Pick whichever option matches your setup. The bridge must be on the same broadcast
+            domain as the devices — running it on Vercel won&apos;t work, since Vercel functions
+            can&apos;t receive UDP from your home network.
+          </p>
+
+          <p>
+            <strong className="text-jf-text-primary">Sidecar (self-hosted server)</strong> — if
+            you&apos;re running the Jellybox server on a box you own (NAS, home server, VPS with a
+            VPN back to your LAN), run the bridge as another container alongside it. An
+            already-wired service block lives commented-out in the repo&apos;s{' '}
+            <Code>docker-compose.yml</Code>; uncomment it, set the two env vars, and{' '}
+            <Code>docker compose up -d</Code>.
+          </p>
+
+          <p>
+            <strong className="text-jf-text-primary">Standalone container (Vercel deploy)</strong>{' '}
+            — when the server lives on Vercel, run the bridge by itself on any always-on machine
+            on the device LAN: a Raspberry Pi, NAS, mini-PC, or a spare VM. Build and run with
+            host networking so it can actually see broadcast traffic — Docker bridge networking{' '}
+            <em>won&apos;t</em> receive the packets:
+          </p>
+          <CodeBlock>{`cd apps/server/utils/log-bridge
+docker build -t jellybox-log-bridge .
+
+docker run -d --restart unless-stopped \\
+  --network host \\
+  --name jellybox-log-bridge \\
+  -e JELLYBOX_URL=https://your-app.vercel.app \\
+  -e INGEST_TOKEN=<same value as DEVICE_LOGS_INGEST_TOKEN> \\
+  jellybox-log-bridge`}</CodeBlock>
+
+          <p>
+            Or without Docker, straight from a checkout:
+          </p>
+          <CodeBlock>{`cd apps/server/utils/log-bridge
+JELLYBOX_URL=https://your-app.vercel.app \\
+INGEST_TOKEN=<token> \\
+node index.js`}</CodeBlock>
+
+          <Callout>
+            Host networking is only available on Linux Docker hosts. On Docker Desktop for macOS
+            or Windows, run the bridge directly with <Code>node</Code> instead — bridge networking
+            on those platforms silently drops broadcast packets.
+          </Callout>
+
+          <p>
+            Once the bridge is running, open <Code>/dashboard/device-logs</Code> while signed in
+            as one of the <Code>ADMINS</Code> emails. Trigger any action on a device (a scan, a
+            reboot) and the lines should arrive within a second or two. For a smoke test without a
+            real device:
+          </p>
+          <CodeBlock>{`echo "12345 hello from a fake device" | nc -u -w1 -b 255.255.255.255 5514`}</CodeBlock>
+        </div>
+      </section>
     </div>
   )
 }

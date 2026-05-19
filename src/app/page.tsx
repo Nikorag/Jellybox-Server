@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { auth } from '@/auth'
+import { ScreenCarousel } from '@/components/ScreenCarousel'
 import { APP_NAME, APP_DESCRIPTION } from '@/lib/constants'
 import { getAuthProviderFlags, publicPagesDisabled } from '@/lib/auth-flags'
 import { redirect } from 'next/navigation'
@@ -175,6 +176,21 @@ export default async function LandingPage() {
             </div>
           ))}
         </div>
+
+        {/* Screen showcase */}
+        <section className="mt-28 max-w-6xl w-full mx-auto px-2">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold text-jf-text-primary mb-3">
+              Everything you need, in your pocket
+            </h2>
+            <p className="text-jf-text-secondary max-w-xl mx-auto text-sm">
+              Pair devices, browse your library, and print sticker sheets — all from a phone-first
+              dashboard.
+            </p>
+          </div>
+
+          <ScreenCarousel slides={showcase} />
+        </section>
       </main>
 
       {/* Open source section */}
@@ -253,6 +269,41 @@ export default async function LandingPage() {
     </div>
   )
 }
+
+const showcase = [
+  {
+    src: '/screens/jellyfin-config.png',
+    alt: 'Jellybox dashboard showing Jellyfin server connection settings on an iPhone.',
+    eyebrow: 'One-time setup',
+    title: 'Plug in your Jellyfin server',
+    description:
+      'Drop in your server URL and API token once. Credentials are encrypted at rest and the dashboard takes care of everything else — libraries, sessions and playback clients.',
+  },
+  {
+    src: '/screens/device-config.png',
+    alt: 'Jellybox device configuration screen with API key and default playback client.',
+    eyebrow: 'Pair in seconds',
+    title: 'Register every Jellybox in the house',
+    description:
+      'Give each device a name, generate an API key, and pick the default room or client it plays to. Manage as many Jellyboxes as you like from a single account.',
+  },
+  {
+    src: '/screens/tags.png',
+    alt: 'Tag management screen with a list of RFID tags mapped to movies and shows.',
+    eyebrow: 'Tag once, play forever',
+    title: 'Map RFID tags to anything in your library',
+    description:
+      'Tap a blank tag in scan-capture mode, search your library, and lock in the mapping. Movies, shows, albums, playlists — if Jellyfin can play it, a tag can trigger it.',
+  },
+  {
+    src: '/screens/sticker-sheet.png',
+    alt: 'Printable sticker sheet preview showing artwork-labelled stickers ready to print.',
+    eyebrow: 'Make it tactile',
+    title: 'Print a sticker sheet for your tags',
+    description:
+      'Generate a printable A4 sheet with artwork for each tag — perfect for sticking onto figurines, cards, or the back of DVD cases so kids can find what they want at a glance.',
+  },
+]
 
 const features = [
   {
