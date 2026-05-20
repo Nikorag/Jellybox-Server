@@ -37,7 +37,12 @@ export default function TopProgress() {
 
   // --- Intercept fetch + history mutations (mount-once)
   useEffect(() => {
-    const bump = () => setTick((t) => t + 1)
+    // Defer onto the macrotask queue so we never call setState while React is
+    // still in its commit cycle. Next.js router and some CSS-in-JS libs mutate
+    // history.pushState from inside useInsertionEffect; a microtask is still
+    // considered part of the current React work loop, so setTimeout(0) is the
+    // minimum safe deferral.
+    const bump = () => setTimeout(() => setTick((t) => t + 1), 0)
 
     // fetch wrapping
     const origFetch = window.fetch

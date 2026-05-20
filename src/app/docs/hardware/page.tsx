@@ -1,13 +1,24 @@
 import type { Metadata } from 'next'
-import Image from 'next/image'
 import Link from 'next/link'
 import { getSku } from '@/lib/skus'
+import StlModelViewerLoader from '@/components/docs/StlModelViewerLoader'
+import LightboxImage from '@/components/docs/LightboxImage'
 
 const SKU = getSku('jb-eink-v1')
 
-// PCB resources — set these when the listing and design repo go live.
+// PCB resources — set the Tindie URL when the listing goes live.
 const PCB_TINDIE_URL = '' // e.g. 'https://www.tindie.com/products/.../'
-const PCB_DESIGN_URL = '' // e.g. 'https://github.com/.../jellybox-pcb'
+const PCB_GERBERS_URL = '/downloads/jb-eink-v1-gerbers.zip'
+
+const PCB_3D_MODEL = [
+  {
+    label: 'PCB',
+    description: 'Bare jb-eink-v1 board — drag to rotate, scroll to zoom. Footprints are placed for the ESP32 dev module, PN532, eInk display, NeoPixel ring, and TP4056 charger.',
+    url: '/models/jb-eink-v1.stl',
+    filename: 'jb-eink-v1.stl',
+    color: '#2F7A3C',
+  },
+]
 
 export const metadata: Metadata = { title: 'Components & Wiring — Jellybox Docs' }
 
@@ -135,7 +146,7 @@ export default function HardwarePage() {
         </div>
 
         <figure className="mt-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
-          <Image
+          <LightboxImage
             src="/wiring.png"
             alt="Wiring diagram showing the ESP32 connected to the PN532 NFC reader, Waveshare eInk display, and NeoPixel ring."
             width={1600}
@@ -197,9 +208,9 @@ export default function HardwarePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <figure className="rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
-            <Image
-              src="/pcb.jpeg"
-              alt="Assembled Jellybox PCB with ESP32, PN532 NFC reader, eInk display, and NeoPixel ring fitted."
+            <LightboxImage
+              src="/images/pcb/pcb-top.png"
+              alt="Top side of the jb-eink-v1 PCB, showing headers for the ESP32 dev module, PN532, eInk display, NeoPixel ring, and TP4056 charger."
               width={1600}
               height={1200}
               sizes="(max-width: 768px) 100vw, 360px"
@@ -207,13 +218,13 @@ export default function HardwarePage() {
               unoptimized
             />
             <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
-              Assembled Jellybox PCB with modules fitted.
+              Top side — module headers, NFC, eInk, NeoPixel, charger footprints.
             </figcaption>
           </figure>
           <figure className="rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
-            <Image
-              src="/schematic.jpeg"
-              alt="Schematic of the Jellybox custom PCB."
+            <LightboxImage
+              src="/images/pcb/pcb-bottom.png"
+              alt="Bottom side of the jb-eink-v1 PCB, showing routing and the battery pad area."
               width={1600}
               height={1200}
               sizes="(max-width: 768px) 100vw, 360px"
@@ -221,9 +232,28 @@ export default function HardwarePage() {
               unoptimized
             />
             <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
-              Schematic — see the design files for the editable source.
+              Bottom side — routing and battery pads.
             </figcaption>
           </figure>
+        </div>
+
+        <figure className="rounded-xl overflow-hidden border border-jf-border bg-white mb-4">
+          <LightboxImage
+            src="/images/pcb/jb-eink-v1.svg"
+            alt="Schematic of the jb-eink-v1 PCB — ESP32, PN532, eInk display, NeoPixel ring, and TP4056 charger."
+            width={1600}
+            height={1100}
+            sizes="(max-width: 768px) 100vw, 720px"
+            className="w-full h-auto"
+            unoptimized
+          />
+          <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border bg-jf-surface">
+            Schematic — exported from the KiCad source.
+          </figcaption>
+        </figure>
+
+        <div className="mb-4">
+          <StlModelViewerLoader models={PCB_3D_MODEL} />
         </div>
 
         <div className="flex flex-wrap gap-3 mb-4">
@@ -232,7 +262,7 @@ export default function HardwarePage() {
               href={PCB_TINDIE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-jf-primary text-white text-sm font-medium hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-jf-primary text-white text-sm font-medium hover:opacity-90 transition-opacity"
             >
               Buy on Tindie
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -244,7 +274,7 @@ export default function HardwarePage() {
             <span
               aria-disabled="true"
               title="Link coming soon"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-jf-elevated border border-jf-border text-jf-text-muted text-sm font-medium opacity-60 cursor-not-allowed select-none"
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-jf-elevated border border-jf-border text-jf-text-muted text-sm font-medium opacity-60 cursor-not-allowed select-none"
             >
               Buy on Tindie
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -253,32 +283,91 @@ export default function HardwarePage() {
               </svg>
             </span>
           )}
-          {PCB_DESIGN_URL ? (
-            <a
-              href={PCB_DESIGN_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-primary text-sm font-medium hover:border-jf-primary/50 transition-colors"
-            >
-              Design files
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          ) : (
-            <span
-              aria-disabled="true"
-              title="Link coming soon"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-muted text-sm font-medium opacity-60 cursor-not-allowed select-none"
-            >
-              Design files
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </span>
-          )}
+          <a
+            href={PCB_GERBERS_URL}
+            download
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-primary text-sm font-medium hover:border-jf-primary/50 transition-colors"
+          >
+            Download gerbers (ZIP)
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </a>
+        </div>
+
+        <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
+          Want to fabricate your own? The <strong className="text-jf-text-primary">Download
+          gerbers</strong> button above gives you the manufacturing files as a single ZIP.
+          Upload it directly to a fab house like{' '}
+          <a href="https://jlcpcb.com" target="_blank" rel="noopener noreferrer"
+            className="text-jf-primary hover:underline">JLCPCB</a>,{' '}
+          <a href="https://www.pcbway.com" target="_blank" rel="noopener noreferrer"
+            className="text-jf-primary hover:underline">PCBWay</a>, or{' '}
+          <a href="https://oshpark.com" target="_blank" rel="noopener noreferrer"
+            className="text-jf-primary hover:underline">OSH Park</a>. The board is two-layer,
+          1.6 mm FR4, with 0.2 mm minimum trace/space — well within every fab house&apos;s
+          cheapest tier. A run of 5 boards typically costs $5–10 plus shipping.
+        </p>
+
+        <SectionHeader
+          title="Board dimensions &amp; mounting holes"
+          description="For anyone designing their own enclosure or 3D-printed shell around the PCB."
+        />
+
+        <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
+          The PCB is <strong className="text-jf-text-primary">77.14 × 33.01 mm</strong>,
+          two-layer FR4, 1.6 mm thick. Four <strong className="text-jf-text-primary">2.0 mm
+          mounting holes</strong> (M2 clearance) sit near the corners — positions are
+          measured from the bottom-left corner of the board outline.
+        </p>
+
+        <div className="rounded-lg border border-jf-border overflow-hidden mb-4">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-jf-border bg-jf-elevated">
+                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Hole</th>
+                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">X (mm)</th>
+                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Y (mm)</th>
+                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Ø (mm)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { id: 'M1 (bottom-left)',  x: '1.27',  y: '1.47',  d: '2.0' },
+                { id: 'M2 (bottom-right)', x: '75.70', y: '1.67',  d: '2.0' },
+                { id: 'M3 (top-left)',     x: '1.47',  y: '31.65', d: '2.0' },
+                { id: 'M4 (top-right)',    x: '75.70', y: '31.55', d: '2.0' },
+              ].map((h) => (
+                <tr key={h.id} className="border-b border-jf-border last:border-0 hover:bg-jf-elevated/50">
+                  <td className="px-3 py-2 font-mono text-jf-primary font-medium">{h.id}</td>
+                  <td className="px-3 py-2 font-mono text-jf-text-primary">{h.x}</td>
+                  <td className="px-3 py-2 font-mono text-jf-text-primary">{h.y}</td>
+                  <td className="px-3 py-2 font-mono text-jf-text-primary">{h.d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
+          For the full, dimensioned reference — including every via and component
+          hole — see the drill map:
+        </p>
+
+        <div className="flex flex-wrap gap-3 mb-4">
+          <a
+            href="/downloads/jb-eink-v1-drl_map.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-primary text-sm font-medium hover:border-jf-primary/50 transition-colors"
+          >
+            Drill map (PDF)
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </a>
         </div>
 
         <Callout>
@@ -413,7 +502,7 @@ export default function HardwarePage() {
         </ul>
 
         <figure className="my-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
-          <Image
+          <LightboxImage
             src="/stickers.png"
             alt="A Jellybox device on a child's table next to an open ring-binder folio holding printed children's-book sticker cards, with more cards (Tractor Ted, The Gruffalo, Bluey, Kipper) laid out in front."
             width={1122}

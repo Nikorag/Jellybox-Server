@@ -26,7 +26,7 @@ export default function CasePage() {
           These STLs fit this hardware variant only — other Jellybox SKUs need different enclosures.
         </div>
         <a
-          href="https://www.tinkercad.com/things/9veK57fYtEN-jellybox-case?sharecode=Kz9MUFZP3gR27f36WOPv8fyj_9rZoQ1cSTjR1Jlf0dc"
+          href="https://www.tinkercad.com/things/89kYEslCrPd-jellybox-case?sharecode=00dBa8bcIP_gQ2JPVDjqkMXBuBFMrcjU0x3fYSvjga0"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 mt-3 text-sm text-jf-primary hover:text-jf-primary-hover transition-colors"
@@ -56,6 +56,18 @@ export default function CasePage() {
             description: 'Top panel — screws onto the case body to enclose the electronics.',
             href: `${RAW_BASE}/Jellybox%20Lid.stl`,
             filename: 'Jellybox Lid.stl',
+          },
+          {
+            label: 'Jellybox Logo',
+            description: 'Logo - Optionally attach this to the top case lid with a dab of glue to show off your Jellybox pride!',
+            href: `${RAW_BASE}/Jellybox%20Logo.stl`,
+            filename: 'Jellybox Logo.stl',
+          },
+          {
+            label: 'Jellybox Ring',
+            description: 'Ring - Optionally attach this over the top of the NeoPixel ring with a dab of glue for a diffused glow effect.',
+            href: `${RAW_BASE}/Jellybox%20Ring.stl`,
+            filename: 'Jellybox Ring.stl',
           },
         ].map((file) => (
           <a

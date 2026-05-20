@@ -5,13 +5,21 @@ import * as THREE from 'three'
 import { STLLoader } from 'three-stdlib'
 import { OrbitControls } from 'three-stdlib'
 
-const MODELS = [
+export type StlModel = {
+  label: string
+  description: string
+  url: string
+  filename: string
+  color: string
+}
+
+const DEFAULT_MODELS: StlModel[] = [
   {
     label: 'Case',
     description: 'Main body — houses the ESP32, eInk display, NFC module, and NeoPixel ring. Includes the NFC pass-through area for scanning.',
     url: 'https://raw.githubusercontent.com/Nikorag/Jellybox-Firmware/main/models/Jellybox%20Case.stl',
     filename: 'Jellybox Case.stl',
-    color: '#00A4DC',
+    color: '#000000',
   },
   {
     label: 'Lid',
@@ -20,13 +28,27 @@ const MODELS = [
     filename: 'Jellybox Lid.stl',
     color: '#AA5CC3',
   },
+  {
+    label: 'Logo',
+    description: 'Logo - Optionally attach this to the top case lid with a dab of glue to show off your Jellybox pride!',
+    url: 'https://raw.githubusercontent.com/Nikorag/Jellybox-Firmware/main/models/Jellybox%20Logo.stl',
+    filename: 'Jellybox Logo.stl',
+    color: '#AA5CC3',
+  },
+  {
+    label: 'Ring',
+    description: 'Ring - Optionally attach this over the top of the NeoPixel ring with a dab of glue for a diffused glow effect.',
+    url: 'https://raw.githubusercontent.com/Nikorag/Jellybox-Firmware/main/models/Jellybox%20Ring.stl',
+    filename: 'Jellybox Ring.stl',
+    color: '#FFFFFF',
+  },
 ]
 
-export default function StlModelViewer() {
+export default function StlModelViewer({ models = DEFAULT_MODELS }: { models?: StlModel[] } = {}) {
   const [active, setActive] = useState(0)
   const [loading, setLoading] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
-  const model = MODELS[active]
+  const model = models[active]
 
   useEffect(() => {
     const container = containerRef.current
@@ -126,7 +148,7 @@ export default function StlModelViewer() {
       {/* Tab bar */}
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-jf-border bg-jf-elevated">
         <div className="flex gap-1">
-          {MODELS.map((m, i) => (
+          {models.length > 1 && models.map((m, i) => (
             <button
               key={m.label}
               type="button"

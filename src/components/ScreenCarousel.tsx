@@ -51,7 +51,7 @@ export function ScreenCarousel({ slides }: { slides: Slide[] }) {
             <div
               key={slide.src}
               aria-hidden={!isActive}
-              className={`absolute inset-0 grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center transition-opacity duration-700 ${
+              className={`absolute inset-0 grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-16 items-center transition-opacity duration-700 ${
                 state === 'hidden' ? 'opacity-0 pointer-events-none' : 'opacity-100'
               } ${state === 'prev' ? 'pointer-events-none' : ''}`}
             >
