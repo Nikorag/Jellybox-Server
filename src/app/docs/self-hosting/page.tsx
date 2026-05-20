@@ -212,28 +212,7 @@ FIRMWARE_VERSION=v0.0.2`}</CodeBlock>
           </Callout>
         </Step>
 
-        <Step n={8} title="Home Assistant via MQTT (optional)">
-          <p>
-            The compose file ships a commented-out <Code>mosquitto</Code>{' '}
-            service. Uncomment it (plus the two mosquitto volumes at the
-            bottom), drop in a config + password file, then add to your{' '}
-            <Code>.env</Code>:
-          </p>
-          <CodeBlock>{`MQTT_URL=mqtt://mosquitto:1883
-MQTT_USERNAME=jellybox
-MQTT_PASSWORD=<the password you set when running mosquitto_passwd>`}</CodeBlock>
-          <p>
-            Every paired Jellybox then auto-registers in Home Assistant via
-            MQTT Discovery — sensors for the last scanned tag and last-seen
-            timestamp, plus a Tag-scanned event entity. Step-by-step (config
-            file, password file, HA integration) in{' '}
-            <Link href="/docs/home-assistant#self-hosted" className="text-jf-primary hover:underline">
-              Home Assistant → Self-hosted setup
-            </Link>.
-          </p>
-        </Step>
-
-        <Step n={9} title="Backups">
+        <Step n={8} title="Backups">
           <p>
             All persistent state lives in the <Code>jellybox-postgres</Code> named
             volume. Snapshot it with:

@@ -3,7 +3,6 @@ import { db } from '@/lib/db'
 import { verifySecret } from '@/lib/crypto'
 import { getFirmwareManifest, selectBuild } from '@/lib/firmware-manifest'
 import { DEFAULT_SKU, isKnownSku } from '@/lib/skus'
-import { publishDeviceCheckIn } from '@/lib/mqtt'
 
 /**
  * GET /api/device/me
@@ -97,8 +96,6 @@ export async function GET(req: Request) {
       ...(clearPending ? { firmwareUpdatePending: false } : {}),
     },
   })
-
-  void publishDeviceCheckIn({ id: device.id, name: device.name })
 
   return NextResponse.json({
     name: device.name,

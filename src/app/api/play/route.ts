@@ -12,7 +12,6 @@ import { checkRateLimit } from '@/lib/rate-limit'
 import { isWithinOperatingHours } from '@/lib/utils'
 import { PLAY_ERROR, WEBHOOK_MAX_WAIT_SECONDS } from '@/lib/constants'
 import { fireNotifications } from '@/lib/notifications'
-import { publishTagScan } from '@/lib/mqtt'
 
 const playSchema = z.object({
   tagId: z.string().min(1, 'tagId is required'),
@@ -298,7 +297,6 @@ export async function POST(req: Request) {
     await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, true, null)
     void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', { ...webhookContext, contentTitle: result.content })
     void fireNotifications(matchedDevice.user.id, { event: 'TAG_SCANNED', deviceName: matchedDevice.name, contentTitle: result.content ?? tagLabel })
-    void publishTagScan(matchedDevice, tagLabel, tagId)
     return NextResponse.json({ success: true, content: result.content })
   }
 
@@ -334,7 +332,6 @@ export async function POST(req: Request) {
         await logActivity(matchedDevice.id, matchedDevice.user.id, matchedDevice.name, tagId, tagForLog, true, null)
         void fireWebhooks(matchedDevice.user.id, 'TAG_SCANNED', { ...webhookContext, contentTitle: retry.content })
         void fireNotifications(matchedDevice.user.id, { event: 'TAG_SCANNED', deviceName: matchedDevice.name, contentTitle: retry.content ?? tagLabel })
-        void publishTagScan(matchedDevice, tagLabel, tagId)
         return NextResponse.json({ success: true, content: retry.content })
       }
 

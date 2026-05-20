@@ -9,7 +9,6 @@ const navItems = [
   { href: '/docs/server', label: 'Deploy' },
   { href: '/docs/self-hosting', label: 'Self-host' },
   { href: '/docs/extensions', label: 'Extensions' },
-  { href: '/docs/home-assistant', label: 'Home Assistant' },
   { href: '/docs/hardware', label: 'Hardware' },
   { href: '/docs/firmware', label: 'Firmware' },
   { href: '/docs/case', label: 'Case' },

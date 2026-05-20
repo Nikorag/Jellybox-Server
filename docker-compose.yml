@@ -65,32 +65,6 @@ services:
   #     JELLYBOX_BEARER_SECRET: ${JELLYBOX_HA_BEARER_SECRET}
   #     ACCOUNTS_FILE: /data/accounts.json
 
-  # Optional: Mosquitto MQTT broker, used to publish Home Assistant Discovery
-  # so each paired Jellybox shows up in HA with sensors for "last scanned tag",
-  # "last seen", and "last tag scanned at", plus a Tag-scanned event entity.
-  # When this service is enabled, set in .env:
-  #   MQTT_URL=mqtt://mosquitto:1883
-  #   MQTT_USERNAME=jellybox
-  #   MQTT_PASSWORD=<the value baked into the password file you mount below>
-  # See docs/home-assistant for the password-file recipe.
-  #
-  # Vercel deployments don't use this service — they POST to the mqtt-bridge
-  # util instead (utils/mqtt-bridge) which forwards to a Mosquitto you already
-  # run alongside Home Assistant.
-  #
-  # mosquitto:
-  #   image: eclipse-mosquitto:2
-  #   restart: unless-stopped
-  #   ports:
-  #     # 1883 is for clients on your LAN (e.g. Home Assistant). Jellybox in
-  #     # this compose talks to mosquitto on the internal docker network, so
-  #     # this publish is only needed if HA lives on a different host.
-  #     - "1883:1883"
-  #   volumes:
-  #     - ./mosquitto/config:/mosquitto/config:ro
-  #     - jellybox-mosquitto-data:/mosquitto/data
-  #     - jellybox-mosquitto-log:/mosquitto/log
-
   # Optional: forwards UDP log broadcasts from Jellybox firmware to the server's
   # /api/device-logs/ingest so admins can watch logs live in the dashboard.
   # Needs network_mode: host to receive LAN broadcasts (bridge networking
@@ -110,5 +84,3 @@ services:
 volumes:
   jellybox-postgres:
   # jellybox-ha-accounts:
-  # jellybox-mosquitto-data:
-  # jellybox-mosquitto-log:

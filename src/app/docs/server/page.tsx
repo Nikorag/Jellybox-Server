@@ -295,27 +295,6 @@ npm run db:migrate`}</CodeBlock>
         </Step>
       </div>
 
-      {/* Home Assistant */}
-      <section className="mt-4 mb-10">
-        <h2 className="text-lg font-semibold text-jf-text-primary mb-3">Home Assistant (MQTT)</h2>
-        <div className="space-y-3 text-sm text-jf-text-secondary leading-relaxed">
-          <p>
-            Optional. When the MQTT module is enabled, every paired Jellybox
-            auto-registers in Home Assistant via MQTT Discovery — sensors for
-            the last scanned tag and last-seen timestamp, plus a Tag-scanned
-            event entity for automations. Vercel can&apos;t reach a Mosquitto
-            broker on your home LAN directly, so you run the{' '}
-            <Code>mqtt-bridge</Code> util alongside Mosquitto and it connects{' '}
-            outbound to your Vercel deployment over an authenticated SSE
-            stream — no port forward or public hostname needed. Full
-            walkthrough in{' '}
-            <Link href="/docs/home-assistant#vercel" className="text-jf-primary hover:underline">
-              Home Assistant → Vercel setup
-            </Link>.
-          </p>
-        </div>
-      </section>
-
       {/* Device log bridge */}
       <section id="log-bridge" className="mt-4 mb-10 scroll-mt-24">
         <h2 className="text-lg font-semibold text-jf-text-primary mb-3">Device log bridge</h2>
