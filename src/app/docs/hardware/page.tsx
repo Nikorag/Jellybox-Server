@@ -1,26 +1,185 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { getSku } from '@/lib/skus'
+import { redirect } from 'next/navigation'
+import { getSku, SKUS, type SkuId } from '@/lib/skus'
 import StlModelViewerLoader from '@/components/docs/StlModelViewerLoader'
 import LightboxImage from '@/components/docs/LightboxImage'
 
-const SKU = getSku('jb-eink-v1')
+// ── Per-SKU hardware data ──────────────────────────────────────────────────
+// All hardware-page specifics live in this block. To add a SKU: append an
+// entry, drop the matching assets under public/, and the page picks it up.
 
-// PCB resources — set the Tindie URL when the listing goes live.
-const PCB_TINDIE_URL = '' // e.g. 'https://www.tindie.com/products/.../'
-const PCB_GERBERS_URL = '/downloads/jb-eink-v1-gerbers.zip'
+type BomRow = { component: string; notes: string; qty: number | string }
+type PinRow = { from: string; to: string; desc: string }
+type PinTableData = { title: string; note?: string; rows: PinRow[] }
+type Hole = { id: string; x: string; y: string; d: string }
 
-const PCB_3D_MODEL = [
-  {
-    label: 'PCB',
-    description: 'Bare jb-eink-v1 board — drag to rotate, scroll to zoom. Footprints are placed for the ESP32 dev module, PN532, eInk display, NeoPixel ring, and TP4056 charger.',
-    url: '/models/jb-eink-v1.stl',
-    filename: 'jb-eink-v1.stl',
-    color: '#2F7A3C',
+interface HardwareConfig {
+  intro: string
+  bom: BomRow[]
+  pcb: {
+    dimensions: string
+    holes: Hole[]
+    topImage: string
+    bottomImage: string
+    schematicSvg: string
+    stl: string
+    gerbersZip: string
+    drillMapPdf: string
+    tindieUrl: string
+    topCaption: string
+    bottomCaption: string
+  }
+  wiring: {
+    diagramImage: string
+    diagramAlt: string
+    diagramCaption: string
+    /** Display section (eInk on Classic, TFT on Studio). */
+    displayTable: PinTableData
+    /** Extra peripheral tables (TFT adds I²S amp + rotary encoder). */
+    extraTables?: PinTableData[]
+  }
+}
+
+const HARDWARE: Record<SkuId, HardwareConfig> = {
+  'jb-eink-v1': {
+    intro:
+      'Everything you need to build a Jellybox device from scratch. The Classic build is intentionally simple: an ESP32, an NFC reader, an eInk screen, and a NeoPixel ring.',
+    bom: [
+      { component: 'ESP32 dev board', notes: 'Any 38-pin ESP32 DevKit works. The BOOT button (GPIO0) is used for factory reset.', qty: 1 },
+      { component: 'PN532 NFC/RFID module', notes: 'Must support I²C mode. Most breakout boards (Elechouse, AZDelivery) include mode-select DIP switches.', qty: 1 },
+      { component: 'Waveshare 2.9" V2 B/W eInk display', notes: 'Part number: 2.9inch e-Paper Module (B). 296×128 pixels, SPI interface. Make sure it is V2.', qty: 1 },
+      { component: 'NeoPixel 16-LED ring (WS2812B)', notes: 'Any WS2812B 16-LED ring. Unbranded ones from Amazon/AliExpress work fine.', qty: 1 },
+      { component: 'LiPo battery + TP4056 charger board', notes: 'A 1000–2000 mAh single-cell LiPo with a TP4056 (micro-USB or USB-C) charging board.', qty: 1 },
+      { component: 'SPDT power switch', notes: 'Fitted in line between the TP4056 output and the ESP32 so the device can be turned off completely.', qty: 1 },
+      { component: 'Breadboard or perfboard + jumper wires', notes: 'For prototyping.', qty: 1 },
+      { component: 'RFID/NFC tags (NTAG213 or NTAG215)', notes: "Standard ISO 14443A tags. CR80 PVC stickers (85.6 × 53.98 mm) pair with the dashboard's sticker sheet designer.", qty: '10+' },
+    ],
+    pcb: {
+      dimensions:
+        'The PCB is 77.14 × 33.01 mm, two-layer FR4, 1.6 mm thick. Four 2.0 mm mounting holes (M2 clearance) sit near the corners — positions are measured from the bottom-left corner of the board outline.',
+      holes: [
+        { id: 'M1 (bottom-left)',  x: '1.27',  y: '1.47',  d: '2.0' },
+        { id: 'M2 (bottom-right)', x: '75.70', y: '1.67',  d: '2.0' },
+        { id: 'M3 (top-left)',     x: '1.47',  y: '31.65', d: '2.0' },
+        { id: 'M4 (top-right)',    x: '75.70', y: '31.55', d: '2.0' },
+      ],
+      topImage: '/images/pcb/pcb-top-jb-eink-v1.png',
+      bottomImage: '/images/pcb/pcb-bottom-jb-eink-v1.png',
+      schematicSvg: '/images/pcb/jb-eink-v1.svg',
+      stl: '/models/jb-eink-v1.stl',
+      gerbersZip: '/downloads/jb-eink-v1-gerbers.zip',
+      drillMapPdf: '/downloads/jb-eink-v1-drl_map.pdf',
+      tindieUrl: '',
+      topCaption: 'Top side — module headers, NFC, eInk, NeoPixel, charger footprints.',
+      bottomCaption: 'Bottom side — routing and battery pads.',
+    },
+    wiring: {
+      diagramImage: '/wiring.png',
+      diagramAlt: 'Wiring diagram showing the ESP32 connected to the PN532 NFC reader, Waveshare eInk display, and NeoPixel ring.',
+      diagramCaption: 'Wiring overview — ESP32 to PN532, eInk display, and NeoPixel ring.',
+      displayTable: {
+        title: 'Waveshare 2.9″ V2 eInk display (SPI)',
+        note: "The display uses the ESP32's default VSPI bus (MOSI=23, CLK=18). Other pins are defined in Config.h.",
+        rows: [
+          { from: 'VCC', to: '3.3V', desc: '' },
+          { from: 'GND', to: 'GND', desc: '' },
+          { from: 'DIN (MOSI)', to: 'GPIO 23', desc: 'SPI MOSI — shared VSPI bus' },
+          { from: 'CLK (SCK)', to: 'GPIO 18', desc: 'SPI clock — shared VSPI bus' },
+          { from: 'CS', to: 'GPIO 5', desc: 'Chip select — active low' },
+          { from: 'DC', to: 'GPIO 17', desc: 'Data / command select' },
+          { from: 'RST', to: 'GPIO 16', desc: 'Reset' },
+          { from: 'BUSY', to: 'GPIO 4', desc: 'Busy signal — wait for LOW before sending commands' },
+        ],
+      },
+    },
   },
-]
+  'jb-tft-v1': {
+    intro:
+      'The Studio build adds a 320×240 colour TFT, an I²S speaker for audio cues, and a rotary encoder for volume. Base ESP32 + PN532 + NeoPixel ring is unchanged from the Classic.',
+    bom: [
+      { component: 'ESP32 dev board', notes: 'Any 38-pin ESP32 DevKit. BOOT button (GPIO0) used for factory reset.', qty: 1 },
+      { component: 'PN532 NFC/RFID module', notes: 'I²C mode. Same as the Classic.', qty: 1 },
+      { component: '2.4" ST7789 colour TFT (320×240, SPI)', notes: 'Bare 8-pin module without a touch controller. Verify the pin order against your breakout — vendors vary. BLK/LED stays tied to 3.3 V; no GPIO backlight control in firmware.', qty: 1 },
+      { component: 'MAX98357A I²S amplifier breakout', notes: 'Adafruit #3006, AZ-Delivery, or any equivalent 5-pin breakout. Leave GAIN and SD floating for default 9 dB always-on operation.', qty: 1 },
+      { component: 'Speaker — 4 Ω or 8 Ω, ≥ 1 W', notes: 'Two leads into the speaker terminal on the PCB. The board routes them back to the amp\'s SPK+/SPK− pads — no flying wires. Pick something small enough to fit your enclosure.', qty: 1 },
+      { component: 'KY-040 rotary encoder', notes: '5-pin breakout with onboard pull-ups. ESP32 input-only pins (34/35/39) are used so no external resistors are required.', qty: 1 },
+      { component: 'NeoPixel 16-LED ring (WS2812B)', notes: 'Same as the Classic.', qty: 1 },
+      { component: 'LiPo battery + TP4056 charger board', notes: 'Same as the Classic — 1000–2000 mAh single-cell LiPo through a TP4056.', qty: 1 },
+      { component: 'SPDT power switch', notes: 'In line between TP4056 output and ESP32 VIN.', qty: 1 },
+      { component: 'RFID/NFC tags (NTAG213 or NTAG215)', notes: 'Same as the Classic.', qty: '10+' },
+    ],
+    pcb: {
+      dimensions:
+        'The Studio PCB carries the same ESP32, PN532, NeoPixel and charger headers as the Classic plus two extra connectors (I²S amp + rotary encoder) and an 8-pin TFT header in place of the eInk one. Exact dimensions and mounting-hole positions are taken from the current KiCad layout — update this entry once the board is finalised.',
+      holes: [],
+      topImage: '/images/pcb/pcb-top-jb-tft-v1.png',
+      bottomImage: '/images/pcb/pcb-bottom-jb-tft-v1.png',
+      schematicSvg: '/images/pcb/jb-tft-v1.svg',
+      stl: '/models/jb-tft-v1.stl',
+      gerbersZip: '/downloads/jb-tft-v1-gerbers.zip',
+      drillMapPdf: '/downloads/jb-tft-v1-drl_map.pdf',
+      tindieUrl: '',
+      topCaption: 'Top side — headers for ESP32, PN532, TFT, NeoPixel, I²S amp, rotary encoder, and charger.',
+      bottomCaption: 'Bottom side — routing and battery pads.',
+    },
+    wiring: {
+      diagramImage: '/wiring.png',
+      diagramAlt: 'Wiring overview — ESP32 connected to PN532, ST7789 TFT, MAX98357A I²S amp, rotary encoder, and NeoPixel ring.',
+      diagramCaption: 'Wiring overview — Studio build. (A dedicated TFT diagram is on the way; this image is the Classic for now.)',
+      displayTable: {
+        title: '2.4″ ST7789 colour TFT (SPI)',
+        note: 'Reuses the same SPI bus (MOSI=23, SCK=18) and chip-select / data-command / reset pins as the Classic eInk. BUSY (GPIO 4) is unused — the BLK / LED backlight pin sits on 3.3 V instead.',
+        rows: [
+          { from: 'GND', to: 'GND', desc: '' },
+          { from: 'VCC', to: '3.3V', desc: 'Module accepts 3.3 V or 5 V — 3.3 V is plenty.' },
+          { from: 'SCL (SCK)', to: 'GPIO 18', desc: 'SPI clock — shared VSPI bus' },
+          { from: 'SDA (MOSI)', to: 'GPIO 23', desc: 'SPI MOSI — shared VSPI bus' },
+          { from: 'RES (RST)', to: 'GPIO 16', desc: 'Reset' },
+          { from: 'DC', to: 'GPIO 17', desc: 'Data / command select' },
+          { from: 'CS', to: 'GPIO 5', desc: 'Chip select — active low' },
+          { from: 'BLK / LED', to: '3.3V', desc: 'Backlight always-on (no PWM control in firmware)' },
+        ],
+      },
+      extraTables: [
+        {
+          title: 'MAX98357A I²S amplifier',
+          note: 'GAIN and SD inputs are left floating — default 9 dB gain, always-on. The amp\'s SPK+ / SPK− output pads are routed through the PCB straight to the speaker terminal, so no flying wires are needed at assembly — solder the amp module into its 7-pin header and the speaker into its 2-pin terminal.',
+          rows: [
+            { from: 'VIN', to: '5V (VIN)', desc: 'Run the amp off the 5 V rail (TP4056 output) — louder than 3.3 V.' },
+            { from: 'GND', to: 'GND', desc: '' },
+            { from: 'DIN', to: 'GPIO 32', desc: 'I²S data' },
+            { from: 'BCLK', to: 'GPIO 14', desc: 'I²S bit clock' },
+            { from: 'LRC', to: 'GPIO 33', desc: 'I²S left/right select (word clock)' },
+            { from: 'SPK+', to: 'Speaker terminal +', desc: 'Routed on the PCB to the speaker connector — no wire needed' },
+            { from: 'SPK−', to: 'Speaker terminal −', desc: 'Routed on the PCB to the speaker connector — no wire needed' },
+          ],
+        },
+        {
+          title: 'Speaker terminal (2-pin)',
+          note: 'The two pads on the PCB connect internally to the amp\'s SPK+/SPK− outputs. Polarity matters for stereo phasing but not for a single mono speaker — wire either way.',
+          rows: [
+            { from: '+', to: 'Amp SPK+', desc: 'PCB trace from the amp output' },
+            { from: '−', to: 'Amp SPK−', desc: 'PCB trace from the amp output' },
+          ],
+        },
+        {
+          title: 'KY-040 rotary encoder',
+          note: 'Encoder breakout has onboard pull-ups on CLK/DT, so the ESP32’s input-only pins (34/35/39) can be used without external resistors.',
+          rows: [
+            { from: 'GND', to: 'GND', desc: '' },
+            { from: '+', to: '3.3V', desc: '' },
+            { from: 'SW', to: 'GPIO 39', desc: 'Push-button — reserved; not used in v1 firmware' },
+            { from: 'DT', to: 'GPIO 34', desc: 'Encoder data' },
+            { from: 'CLK', to: 'GPIO 35', desc: 'Encoder clock' },
+          ],
+        },
+      ],
+    },
+  },
+}
 
-export const metadata: Metadata = { title: 'Components & Wiring — Jellybox Docs' }
+// ── Primitives ─────────────────────────────────────────────────────────────
 
 function SectionHeader({ title, description }: { title: string; description?: string }) {
   return (
@@ -31,11 +190,7 @@ function SectionHeader({ title, description }: { title: string; description?: st
   )
 }
 
-function PinTable({ title, note, rows }: {
-  title: string
-  note?: string
-  rows: { from: string; to: string; desc: string }[]
-}) {
+function PinTable({ title, note, rows }: PinTableData) {
   return (
     <div className="mb-6">
       <h3 className="text-sm font-semibold text-jf-text-primary mb-1">{title}</h3>
@@ -83,50 +238,48 @@ function Callout({ variant = 'info', children }: { variant?: 'info' | 'warn'; ch
   )
 }
 
-const bom = [
-  {
-    component: 'ESP32 dev board',
-    notes: 'Any 38-pin ESP32 DevKit works. The BOOT button (GPIO0) is used for factory reset.',
-    qty: 1,
-  },
-  {
-    component: 'PN532 NFC/RFID module',
-    notes: 'Must support I²C mode. Most breakout boards (Elechouse, AZDelivery) include mode-select DIP switches.',
-    qty: 1,
-  },
-  {
-    component: 'Waveshare 2.9" V2 B/W eInk display',
-    notes: 'Part number: 2.9inch e-Paper Module (B). 296×128 pixels, SPI interface. Make sure it is V2.',
-    qty: 1,
-  },
-  {
-    component: 'NeoPixel 16-LED ring (WS2812B)',
-    notes: 'Any WS2812B 16-LED ring. Unbranded ones from Amazon/AliExpress work fine.',
-    qty: 1,
-  },
-  {
-    component: 'LiPo battery + TP4056 charger board',
-    notes: 'Jellybox is designed to run on a battery. A 1000–2000 mAh single-cell LiPo with a TP4056 (micro-USB or USB-C) charging board works well.',
-    qty: 1,
-  },
-  {
-    component: 'SPDT power switch',
-    notes: 'Any small slide or toggle switch rated for the battery current. Fitted in line between the TP4056 output and the ESP32 so the device can be turned off completely.',
-    qty: 1,
-  },
-  {
-    component: 'Breadboard or perfboard + jumper wires',
-    notes: 'For prototyping. A 400-point breadboard and a pack of jumper wires is all you need to get started.',
-    qty: 1,
-  },
-  {
-    component: 'RFID/NFC tags (NTAG213 or NTAG215)',
-    notes: 'Standard ISO 14443A tags. Cards, stickers, or keyring fobs all work. Credit-card-format (CR80, 85.6 × 53.98 mm) PVC stickers pair with the dashboard\'s built-in sticker sheet designer (Tags → Create sticker sheet) for printable poster artwork. Buy in packs of 10–50.',
-    qty: '10+',
-  },
-]
+function SkuSwitcher({ active }: { active: SkuId }) {
+  return (
+    <div className="inline-flex rounded-lg border border-jf-border bg-jf-surface p-0.5 mb-5">
+      {SKUS.map((sku) => {
+        const href = sku.id === 'jb-eink-v1' ? '/docs/hardware' : `/docs/hardware?sku=${sku.id}`
+        const isActive = sku.id === active
+        return (
+          <Link
+            key={sku.id}
+            href={href}
+            className={
+              'px-3 py-1.5 rounded-md text-xs font-medium transition-colors ' +
+              (isActive
+                ? 'bg-jf-primary text-white shadow-sm'
+                : 'text-jf-text-secondary hover:text-jf-text-primary hover:bg-jf-elevated')
+            }
+          >
+            {sku.shortName}
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
 
-export default function HardwarePage() {
+// ── Page ───────────────────────────────────────────────────────────────────
+
+export const metadata: Metadata = { title: 'Components & Wiring — Jellybox Docs' }
+
+export default async function HardwarePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const params = await searchParams
+  const skuParam = typeof params.sku === 'string' ? params.sku : 'jb-eink-v1'
+  if (!(skuParam in HARDWARE)) redirect('/docs/hardware')
+
+  const skuId = skuParam as SkuId
+  const SKU = getSku(skuId)
+  const cfg = HARDWARE[skuId]
+
   return (
     <div>
       <div className="mb-8">
@@ -134,12 +287,13 @@ export default function HardwarePage() {
           ← Self-hosting guide
         </Link>
         <h1 className="text-3xl font-bold text-jf-text-primary mt-3 mb-3">Components &amp; wiring</h1>
-        <p className="text-jf-text-secondary leading-relaxed">
-          Everything you need to build a Jellybox device from scratch. The hardware is intentionally
-          simple: an ESP32, an NFC reader, an eInk screen, and some LEDs.
-        </p>
+        <p className="text-jf-text-secondary leading-relaxed">{cfg.intro}</p>
 
-        <div className="mt-5 rounded-lg border border-jf-primary/30 bg-jf-primary-muted px-4 py-3 text-sm leading-relaxed text-jf-text-secondary">
+        <div className="mt-5">
+          <SkuSwitcher active={skuId} />
+        </div>
+
+        <div className="rounded-lg border border-jf-primary/30 bg-jf-primary-muted px-4 py-3 text-sm leading-relaxed text-jf-text-secondary">
           <strong className="text-jf-text-primary">{SKU.displayName}</strong> (<code className="font-mono text-xs">{SKU.id}</code>).
           These instructions apply to this hardware variant only — other Jellybox SKUs use different
           displays, pinouts, and peripherals.
@@ -147,8 +301,8 @@ export default function HardwarePage() {
 
         <figure className="mt-6 rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
           <LightboxImage
-            src="/wiring.png"
-            alt="Wiring diagram showing the ESP32 connected to the PN532 NFC reader, Waveshare eInk display, and NeoPixel ring."
+            src={cfg.wiring.diagramImage}
+            alt={cfg.wiring.diagramAlt}
             width={1600}
             height={1200}
             sizes="(max-width: 768px) 100vw, 720px"
@@ -157,7 +311,7 @@ export default function HardwarePage() {
             unoptimized
           />
           <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
-            Wiring overview — ESP32 to PN532, eInk display, and NeoPixel ring.
+            {cfg.wiring.diagramCaption}
           </figcaption>
         </figure>
       </div>
@@ -178,7 +332,7 @@ export default function HardwarePage() {
               </tr>
             </thead>
             <tbody>
-              {bom.map((item) => (
+              {cfg.bom.map((item) => (
                 <tr key={item.component} className="border-b border-jf-border last:border-0 hover:bg-jf-elevated/40">
                   <td className="px-4 py-3 font-medium text-jf-text-primary whitespace-nowrap">{item.component}</td>
                   <td className="px-4 py-3 text-jf-text-secondary text-xs leading-relaxed">{item.notes}</td>
@@ -194,23 +348,14 @@ export default function HardwarePage() {
       <section className="mb-10">
         <SectionHeader
           title="Custom PCB"
-          description="Skip the breadboard — a drop-in PCB designed to fit the ESP32 dev board, PN532, eInk display, and NeoPixel ring."
+          description="Skip the breadboard — a drop-in PCB that routes every connection above onto a single board."
         />
 
-        <p className="text-sm text-jf-text-secondary leading-relaxed mb-4">
-          The custom Jellybox PCB routes every connection from the Wiring section
-          onto a single board. Headers are pre-placed for the standard ESP32 dev
-          module, PN532 breakout, Waveshare 2.9″ eInk display, and 16-LED
-          NeoPixel ring, and the TP4056 charger + power switch from the Power
-          section have their own footprints — solder the modules in, fit a
-          battery, done.
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <figure className="rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
             <LightboxImage
-              src="/images/pcb/pcb-top.png"
-              alt="Top side of the jb-eink-v1 PCB, showing headers for the ESP32 dev module, PN532, eInk display, NeoPixel ring, and TP4056 charger."
+              src={cfg.pcb.topImage}
+              alt={`Top side of the ${SKU.id} PCB.`}
               width={1600}
               height={1200}
               sizes="(max-width: 768px) 100vw, 360px"
@@ -218,13 +363,13 @@ export default function HardwarePage() {
               unoptimized
             />
             <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
-              Top side — module headers, NFC, eInk, NeoPixel, charger footprints.
+              {cfg.pcb.topCaption}
             </figcaption>
           </figure>
           <figure className="rounded-xl overflow-hidden border border-jf-border bg-jf-surface">
             <LightboxImage
-              src="/images/pcb/pcb-bottom.png"
-              alt="Bottom side of the jb-eink-v1 PCB, showing routing and the battery pad area."
+              src={cfg.pcb.bottomImage}
+              alt={`Bottom side of the ${SKU.id} PCB.`}
               width={1600}
               height={1200}
               sizes="(max-width: 768px) 100vw, 360px"
@@ -232,15 +377,15 @@ export default function HardwarePage() {
               unoptimized
             />
             <figcaption className="px-4 py-3 text-xs text-jf-text-muted border-t border-jf-border">
-              Bottom side — routing and battery pads.
+              {cfg.pcb.bottomCaption}
             </figcaption>
           </figure>
         </div>
 
         <figure className="rounded-xl overflow-hidden border border-jf-border bg-white mb-4">
           <LightboxImage
-            src="/images/pcb/jb-eink-v1.svg"
-            alt="Schematic of the jb-eink-v1 PCB — ESP32, PN532, eInk display, NeoPixel ring, and TP4056 charger."
+            src={cfg.pcb.schematicSvg}
+            alt={`Schematic of the ${SKU.id} PCB.`}
             width={1600}
             height={1100}
             sizes="(max-width: 768px) 100vw, 720px"
@@ -253,13 +398,23 @@ export default function HardwarePage() {
         </figure>
 
         <div className="mb-4">
-          <StlModelViewerLoader models={PCB_3D_MODEL} />
+          <StlModelViewerLoader
+            models={[
+              {
+                label: 'PCB',
+                description: `Bare ${SKU.id} board — drag to rotate, scroll to zoom.`,
+                url: cfg.pcb.stl,
+                filename: `${SKU.id}.stl`,
+                color: '#2F7A3C',
+              },
+            ]}
+          />
         </div>
 
         <div className="flex flex-wrap gap-3 mb-4">
-          {PCB_TINDIE_URL ? (
+          {cfg.pcb.tindieUrl ? (
             <a
-              href={PCB_TINDIE_URL}
+              href={cfg.pcb.tindieUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg bg-jf-primary text-white text-sm font-medium hover:opacity-90 transition-opacity"
@@ -284,7 +439,7 @@ export default function HardwarePage() {
             </span>
           )}
           <a
-            href={PCB_GERBERS_URL}
+            href={cfg.pcb.gerbersZip}
             download
             className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-primary text-sm font-medium hover:border-jf-primary/50 transition-colors"
           >
@@ -305,9 +460,7 @@ export default function HardwarePage() {
           <a href="https://www.pcbway.com" target="_blank" rel="noopener noreferrer"
             className="text-jf-primary hover:underline">PCBWay</a>, or{' '}
           <a href="https://oshpark.com" target="_blank" rel="noopener noreferrer"
-            className="text-jf-primary hover:underline">OSH Park</a>. The board is two-layer,
-          1.6 mm FR4, with 0.2 mm minimum trace/space — well within every fab house&apos;s
-          cheapest tier. A run of 5 boards typically costs $5–10 plus shipping.
+            className="text-jf-primary hover:underline">OSH Park</a>.
         </p>
 
         <SectionHeader
@@ -316,39 +469,33 @@ export default function HardwarePage() {
         />
 
         <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
-          The PCB is <strong className="text-jf-text-primary">77.14 × 33.01 mm</strong>,
-          two-layer FR4, 1.6 mm thick. Four <strong className="text-jf-text-primary">2.0 mm
-          mounting holes</strong> (M2 clearance) sit near the corners — positions are
-          measured from the bottom-left corner of the board outline.
+          {cfg.pcb.dimensions}
         </p>
 
-        <div className="rounded-lg border border-jf-border overflow-hidden mb-4">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-jf-border bg-jf-elevated">
-                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Hole</th>
-                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">X (mm)</th>
-                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Y (mm)</th>
-                <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Ø (mm)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { id: 'M1 (bottom-left)',  x: '1.27',  y: '1.47',  d: '2.0' },
-                { id: 'M2 (bottom-right)', x: '75.70', y: '1.67',  d: '2.0' },
-                { id: 'M3 (top-left)',     x: '1.47',  y: '31.65', d: '2.0' },
-                { id: 'M4 (top-right)',    x: '75.70', y: '31.55', d: '2.0' },
-              ].map((h) => (
-                <tr key={h.id} className="border-b border-jf-border last:border-0 hover:bg-jf-elevated/50">
-                  <td className="px-3 py-2 font-mono text-jf-primary font-medium">{h.id}</td>
-                  <td className="px-3 py-2 font-mono text-jf-text-primary">{h.x}</td>
-                  <td className="px-3 py-2 font-mono text-jf-text-primary">{h.y}</td>
-                  <td className="px-3 py-2 font-mono text-jf-text-primary">{h.d}</td>
+        {cfg.pcb.holes.length > 0 && (
+          <div className="rounded-lg border border-jf-border overflow-hidden mb-4">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-jf-border bg-jf-elevated">
+                  <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Hole</th>
+                  <th className="text-left px-3 py-2 text-jf-text-muted font-medium">X (mm)</th>
+                  <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Y (mm)</th>
+                  <th className="text-left px-3 py-2 text-jf-text-muted font-medium">Ø (mm)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {cfg.pcb.holes.map((h) => (
+                  <tr key={h.id} className="border-b border-jf-border last:border-0 hover:bg-jf-elevated/50">
+                    <td className="px-3 py-2 font-mono text-jf-primary font-medium">{h.id}</td>
+                    <td className="px-3 py-2 font-mono text-jf-text-primary">{h.x}</td>
+                    <td className="px-3 py-2 font-mono text-jf-text-primary">{h.y}</td>
+                    <td className="px-3 py-2 font-mono text-jf-text-primary">{h.d}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         <p className="text-sm text-jf-text-secondary leading-relaxed mb-3">
           For the full, dimensioned reference — including every via and component
@@ -357,7 +504,7 @@ export default function HardwarePage() {
 
         <div className="flex flex-wrap gap-3 mb-4">
           <a
-            href="/downloads/jb-eink-v1-drl_map.pdf"
+            href={cfg.pcb.drillMapPdf}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-5 py-2 rounded-lg border border-jf-border bg-jf-elevated text-jf-text-primary text-sm font-medium hover:border-jf-primary/50 transition-colors"
@@ -405,20 +552,7 @@ export default function HardwarePage() {
           ]}
         />
 
-        <PinTable
-          title="Waveshare 2.9″ V2 eInk display (SPI)"
-          note="The display uses the ESP32's default VSPI bus (MOSI=23, CLK=18). Other pins are defined in Config.h."
-          rows={[
-            { from: 'VCC', to: '3.3V', desc: '' },
-            { from: 'GND', to: 'GND', desc: '' },
-            { from: 'DIN (MOSI)', to: 'GPIO 23', desc: 'SPI MOSI — shared VSPI bus' },
-            { from: 'CLK (SCK)', to: 'GPIO 18', desc: 'SPI clock — shared VSPI bus' },
-            { from: 'CS', to: 'GPIO 5', desc: 'Chip select — active low' },
-            { from: 'DC', to: 'GPIO 17', desc: 'Data / command select' },
-            { from: 'RST', to: 'GPIO 16', desc: 'Reset' },
-            { from: 'BUSY', to: 'GPIO 4', desc: 'Busy signal — wait for LOW before sending commands' },
-          ]}
-        />
+        <PinTable {...cfg.wiring.displayTable} />
 
         <PinTable
           title="NeoPixel 16-LED ring (WS2812B)"
@@ -429,10 +563,14 @@ export default function HardwarePage() {
           ]}
         />
 
+        {cfg.wiring.extraTables?.map((t) => (
+          <PinTable key={t.title} {...t} />
+        ))}
+
         <Callout>
-          Keep wires short and tidy. The eInk SPI bus is particularly sensitive to long wires at high
-          clock speeds — if you see corrupted display output, try reducing the SPI clock in{' '}
-          <code className="text-xs font-mono text-jf-primary">EInkDisplay.h</code> or shortening the wires.
+          Keep wires short and tidy. SPI buses are particularly sensitive to long wires at high
+          clock speeds — if you see corrupted display output, try reducing the SPI clock or
+          shortening the wires.
         </Callout>
       </section>
 
