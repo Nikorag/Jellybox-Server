@@ -19,15 +19,15 @@ export type Sku = {
 export const SKUS: readonly Sku[] = [
   {
     id: 'jb-eink-v1',
-    displayName: 'Jellybox Classic (eInk)',
-    shortName: 'eInk',
+    displayName: 'Jellybox Classic',
+    shortName: 'Classic',
     description: '2.9" Waveshare eInk display with a 16-pixel NeoPixel ring.',
     chipFamily: 'ESP32',
   },
   {
     id: 'jb-tft-v1',
-    displayName: 'Jellybox Studio (TFT + audio)',
-    shortName: 'TFT',
+    displayName: 'Jellybox Studio',
+    shortName: 'Studio',
     description:
       '2.4" 320×240 ST7789 colour TFT, I2S speaker, volume dial, 16-pixel NeoPixel ring.',
     chipFamily: 'ESP32',
